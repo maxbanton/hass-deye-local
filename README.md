@@ -7,8 +7,8 @@
 [![License](https://img.shields.io/github/license/maxbanton/hass-deye-local)](LICENSE)
 [![Home Assistant](https://img.shields.io/badge/Home%20Assistant-2025.3%2B-41BDF5.svg)](https://www.home-assistant.io)
 
-Home Assistant integration for Deye hybrid inverters that reads the inverter
-locally over Bluetooth, through the WiBLE data logger that is already plugged
+Home Assistant integration for Deye hybrid inverters that reads and controls the
+inverter locally over Bluetooth, through the WiBLE data logger that is already plugged
 into it. No cloud, no internet, no extra wiring.
 
 > [!WARNING]
@@ -46,7 +46,11 @@ than a Bluetooth adapter or an ESPHome Bluetooth proxy in range.
 - **Battery BMS data**: BMS SOC, voltage and current, the charge and discharge
   limits the BMS asks for, and per-module data for each battery.
 - **Energy counters** with the right state classes for the Energy dashboard.
-- **Read only.** This version never changes a setting on the inverter.
+- **Settings you can change** on single phase hybrids: battery charge and
+  discharge current, grid charge current, shutdown, restart and low SOC, energy
+  pattern, work mode, grid charging, the six time of use slots, max sell and
+  zero export power, and grid peak shaving. Every change is read back from
+  the inverter and reported as an error if it did not stick.
 
 ## What you need
 
@@ -124,8 +128,8 @@ same family as the base model.
 **Experimental** means the register map follows Deye's protocol documents and
 two independent open source implementations, but has not been confirmed on real
 hardware by this project yet.
-Values are read only, and a repair notice asks you to report anything that looks
-wrong.
+Values are read only (no settings are exposed), and a repair notice asks you to
+report anything that looks wrong.
 
 **Recognised, not mapped yet** means setup still succeeds and the device shows
 its type and identity, so you can download the diagnostics and help add it (see
@@ -190,7 +194,8 @@ Deye Single phase hybrid        inverter, grid, load, PV, battery totals, BMS
 
 The essentials are enabled by default. Per string voltages and currents,
 generator, output and CT details, the protocol version and the inverter clock
-are available but disabled; enable any you need from the entity settings.
+are available but disabled, and so are the BMS values; enable any you need
+from the entity settings.
 
 Power and current are signed: battery power and current are negative while the
 battery charges; grid power is positive while importing.
@@ -198,6 +203,46 @@ battery charges; grid power is positive while importing.
 At a 10 second interval power values change on almost every poll. If your
 database grows more than you like, exclude the high frequency sensors you do not
 need from the recorder, or raise the poll interval.
+
+## Settings
+
+Single phase hybrids get these controls on the inverter device:
+
+| Entity | Default |
+|--------|---------|
+| Battery max charge current, Grid charge current, Energy pattern | enabled, under Controls |
+| Battery max discharge current | disabled, under Controls |
+| Battery shutdown and restart SOC, Work mode, Time of use, Grid charge | enabled, under Configuration |
+| Battery low SOC | disabled, under Configuration |
+| TOU slot 1 to 6 time and SOC | enabled, under Configuration |
+| Max sell power, Zero export power, Grid peak shaving and its power | disabled, under Configuration |
+| TOU slot power, voltage, grid charge and generator charge; Generator charge; Grid charge start SOC | disabled, under Configuration |
+
+The two charge currents are separate settings on the inverter's screen:
+**Battery max charge current** is "Max A Charge" on the first battery setting
+page and limits charging from any source; **Grid charge current** is the "A"
+value under Grid Charge on the second page and limits charging from the grid.
+Grid charging is limited by both.
+
+How changes work:
+
+- The value shown is always the one the inverter reports. Settings are re-read
+  every minute, so a change made on the inverter's screen or in the Deye app
+  appears in Home Assistant within a minute.
+- A change first reads the current value from the inverter, then writes only the
+  field you changed. Settings that share a register with others (the time of use
+  switch and its weekdays, a slot's grid and generator charging) keep their other
+  bits as the inverter has them at that moment.
+- After writing, the value is read back until it shows up (the logger may answer
+  from its cache for a few seconds). If the inverter does not keep it, the change
+  fails with an error in Home Assistant instead of pretending to succeed.
+- Limits are only the obvious ones: SOC 0 to 100 %, currents up to 240 A, slot
+  and sell power up to the rated power the inverter reports, and slot start times in
+  ascending order (each slot runs until the next one starts). Everything else is
+  up to the inverter, which rejects what your model or battery does not allow.
+
+Change settings with care: they control how the inverter charges and discharges
+the battery and uses the grid.
 
 ## Battery modules
 
@@ -286,6 +331,9 @@ for a particular purpose and non-infringement. See the [LICENSE](LICENSE).
   this project replaces the manufacturer's documentation, a qualified installer,
   or the protections built into your equipment. Do not rely on it for safety
   critical decisions.
+- Settings you change through it are written to the inverter as you set them.
+  Wrong values can drain or damage batteries or cut power to your loads; check
+  them against your equipment's documentation first.
 - You use it entirely at your own risk and responsibility. The author and
   contributors are not liable for any damage to inverters, batteries, other
   equipment or property, for personal injury, data loss, loss of warranty,

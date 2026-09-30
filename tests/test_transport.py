@@ -51,7 +51,14 @@ class FakeLogger:
         else:
             frame = bytes.fromhex(text.split(",", 1)[1])
             start, count = frame[2] << 8 | frame[3], frame[5]
-            if self.unavailable_from is not None and start >= self.unavailable_from:
+            if frame[1] == protocol.WRITE_MULTIPLE:
+                data = frame[7:-2]
+                for i in range(count):
+                    self.registers[start + i] = data[2 * i] << 8 | data[2 * i + 1]
+                body = frame[:6]
+                crc = protocol.crc16(body)
+                reply = "+ok=" + (body + bytes([crc & 0xFF, crc >> 8])).hex().upper()
+            elif self.unavailable_from is not None and start >= self.unavailable_from:
                 body = bytes([1, 0x83, 2])
                 crc = protocol.crc16(body)
                 reply = "+ok=" + (body + bytes([crc & 0xFF, crc >> 8])).hex().upper()
@@ -244,3 +251,12 @@ async def test_only_illegal_address_means_unavailable(logger, transport, code, e
         await transport.async_read(0x2730, 8)
     if error is TransportError:
         assert not isinstance(caught.value, RegisterUnavailable)
+
+
+async def test_write_sends_write_multiple_and_checks_the_echo(logger, transport) -> None:
+    await transport.async_connect()
+    await transport.async_write(0x00D2, [50])
+    assert logger.registers[0x00D2] == 50
+    command = logger.written[-1][1].decode()
+    assert command.startswith("AT+INVDATA=11,011000D2000102")
+    assert await transport.async_read(0x00D2, 1) == [50]

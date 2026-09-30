@@ -34,5 +34,14 @@ REPLY_TIMEOUT = 5.0
 # How often the battery module slots are re-read to notice added or removed modules.
 BATTERY_SCAN_INTERVAL = 300  # seconds
 
+# Settings rarely change, so they are read less often than live values; a write
+# refreshes them at once.
+SETTINGS_INTERVAL = 60  # seconds
+
+# The logger may answer from its cache for a few seconds after a write, so the
+# read-back is retried until the new value shows up.
+WRITE_VERIFY_TIMEOUT = 20.0  # seconds
+WRITE_VERIFY_DELAY = 2.0  # seconds
+
 # The logger does not answer large reads.
 MAX_BLOCK = 16

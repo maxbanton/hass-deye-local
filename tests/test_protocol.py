@@ -75,3 +75,46 @@ def test_plan_blocks_merges_small_gaps_and_caps_length():
 
 def test_decode_ascii_serial():
     assert protocol.decode_ascii(SERIAL_WORDS) == "2603125693"
+
+
+def test_write_frame_matches_a_known_request():
+    frame = protocol.write_frame(0x00D2, [40])
+    assert frame[:9] == bytes.fromhex("011000D200010200 28".replace(" ", ""))
+    assert protocol.crc16(frame[:-2]) == frame[-2] | frame[-1] << 8
+
+
+def test_write_command_wraps_the_frame():
+    assert protocol.write_command(0x00D2, [40]).startswith("AT+INVDATA=11,011000D2")
+
+
+@pytest.mark.parametrize(("start", "values"), [(0, []), (0, [0x10000]), (0, [-1])])
+def test_write_frame_rejects_invalid_values(start, values):
+    with pytest.raises(ValueError):
+        protocol.write_frame(start, values)
+
+
+def _write_reply(body: bytes) -> str:
+    crc = protocol.crc16(body)
+    return "+ok=" + (body + bytes([crc & 0xFF, crc >> 8])).hex().upper()
+
+
+def test_parse_write_accepts_the_echo():
+    reply = _write_reply(bytes.fromhex("011000D20001"))
+    assert protocol.write_complete(reply)
+    protocol.parse_write(reply, 0x00D2, 1)
+
+
+def test_parse_write_rejects_a_different_address():
+    with pytest.raises(protocol.ProtocolError):
+        protocol.parse_write(_write_reply(bytes.fromhex("011000D30001")), 0x00D2, 1)
+
+
+def test_parse_write_reports_modbus_exceptions():
+    reply = _write_reply(bytes.fromhex("019003"))
+    assert protocol.write_complete(reply)
+    with pytest.raises(protocol.ExceptionReply):
+        protocol.parse_write(reply, 0x00D2, 1)
+
+
+def test_write_complete_waits_for_the_whole_frame():
+    assert not protocol.write_complete("+ok=011000D2")

@@ -99,6 +99,17 @@ class DeyeTransport:
         except protocol.ProtocolError as err:
             raise TransportError(f"read {start:#06x}+{count}: {err}") from err
 
+    async def async_write(self, start: int, values: list[int]) -> None:
+        if not self.connected:
+            raise TransportError("not connected")
+        reply = await self._command(
+            protocol.write_command(start, values), protocol.write_complete
+        )
+        try:
+            protocol.parse_write(reply, start, len(values))
+        except protocol.ProtocolError as err:
+            raise TransportError(f"write {start:#06x}+{len(values)}: {err}") from err
+
     async def async_disconnect(self) -> None:
         client, self._client = self._client, None
         if client is None:

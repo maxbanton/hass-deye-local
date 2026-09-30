@@ -27,7 +27,13 @@ from .coordinator import DeyeLocalCoordinator
 from .entity import async_register_device, inverter_device_info, inverter_identifier
 from .models import Support, family_for
 
-PLATFORMS = [Platform.SENSOR]
+PLATFORMS = [
+    Platform.NUMBER,
+    Platform.SELECT,
+    Platform.SENSOR,
+    Platform.SWITCH,
+    Platform.TIME,
+]
 ISSUES_URL = "https://github.com/maxbanton/hass-deye-local/issues"
 
 type DeyeLocalConfigEntry = ConfigEntry[DeyeLocalCoordinator]

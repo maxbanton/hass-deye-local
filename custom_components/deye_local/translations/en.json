@@ -57,11 +57,40 @@
       "signal_strength": {
         "name": "Signal strength"
       }
+    },
+    "select": {
+      "energy_pattern": {
+        "name": "Energy pattern",
+        "state": {
+          "battery_first": "Battery first",
+          "load_first": "Load first"
+        }
+      },
+      "work_mode": {
+        "name": "Work mode",
+        "state": {
+          "selling_first": "Selling first",
+          "zero_export_to_load": "Zero export to load",
+          "zero_export_to_ct": "Zero export to CT"
+        }
+      }
     }
   },
   "exceptions": {
     "not_in_range": {
       "message": "Data logger {address} is not in range of any Bluetooth adapter or proxy."
+    },
+    "write_failed": {
+      "message": "Could not change {name}: {error}"
+    },
+    "write_not_applied": {
+      "message": "The inverter did not keep the new value of {name}. It may be outside what this model allows."
+    },
+    "out_of_range": {
+      "message": "{value} is not a valid value for {name}."
+    },
+    "tou_order": {
+      "message": "{name} has to be later than the previous slot's start and earlier than the next one's."
     }
   },
   "issues": {

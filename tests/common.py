@@ -8,7 +8,7 @@ from homeassistant.components.bluetooth import BluetoothServiceInfoBleak
 from custom_components.deye_local.const import SERVICE_UUID
 from custom_components.deye_local.transport import RegisterUnavailable, TransportError
 
-from .snapshot import BATTERIES, SNAPSHOT
+from .snapshot import BATTERIES, SETTINGS, SNAPSHOT
 
 ADDRESS = "88:A6:8D:2C:4F:15"
 NAME = "D26109249480"
@@ -51,7 +51,9 @@ class FakeTransport:
 
     def __init__(self, device, registers: dict[int, int] | None = None) -> None:
         self.device = device
-        self.registers = {**SNAPSHOT, **BATTERIES} if registers is None else dict(registers)
+        if registers is None:
+            registers = {**SNAPSHOT, **SETTINGS, **BATTERIES}
+        self.registers = dict(registers)
         self.unavailable_from: int | None = None
         self.unavailable_blocks: set[int] = set()
         self.busy_from: int | None = None
@@ -60,6 +62,9 @@ class FakeTransport:
         self.connects = 0
         self.disconnects = 0
         self.reads: list[tuple[int, int]] = []
+        self.writes: list[tuple[int, list[int]]] = []
+        # Registers the inverter acknowledges but does not change.
+        self.ignored_writes: set[int] = set()
         self.logger_type = "21511,21511"
         FakeTransport.instances.append(self)
 
@@ -84,6 +89,14 @@ class FakeTransport:
         if self.busy_from is not None and start >= self.busy_from:
             raise TransportError("inverter rejected the read (exception 6)")
         return [self.registers.get(start + i, 0) for i in range(count)]
+
+    async def async_write(self, start: int, values: list[int]) -> None:
+        if self.fail:
+            raise TransportError("logger not answering")
+        self.writes.append((start, list(values)))
+        for offset, value in enumerate(values):
+            if start + offset not in self.ignored_writes:
+                self.registers[start + offset] = value
 
     async def async_disconnect(self) -> None:
         if self.connected:

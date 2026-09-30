@@ -5,7 +5,7 @@ own layout. Multi-register values are stored low word first.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from enum import StrEnum
 from functools import cache
 from typing import Any
@@ -84,6 +84,41 @@ class RegisterSensor:
     diagnostic: bool = False
 
 
+class ControlPlatform(StrEnum):
+    NUMBER = "number"
+    SELECT = "select"
+    SWITCH = "switch"
+    TIME = "time"
+
+
+@dataclass(frozen=True, kw_only=True)
+class Control:
+    """A setting held in one holding register.
+
+    ``mask`` limits a control to some bits of its register; the other bits are
+    kept as the inverter reports them at write time. Times are stored as HHMM
+    in decimal.
+    """
+
+    key: str
+    name: str
+    register: int
+    platform: ControlPlatform
+    mask: int = 0xFFFF
+    scale: float = 1
+    minimum: float = 0
+    # None: the inverter's rated power.
+    maximum: float | None = 100
+    step: float = 1
+    slider: bool = False
+    unit: str | None = None
+    device_class: str | None = None
+    options: dict[int, str] = field(default_factory=dict)
+    enabled: bool = True
+    config: bool = True
+    tou_slot: int | None = None
+
+
 @dataclass(frozen=True)
 class Family:
     key: str
@@ -92,10 +127,16 @@ class Family:
     support: Support
     sensors: tuple[RegisterSensor, ...] = field(default=())
     has_battery_modules: bool = False
+    controls: tuple[Control, ...] = field(default=())
+    rated_power: tuple[int, ...] = field(default=())
 
     @property
     def registers(self) -> set[int]:
         return {reg for sensor in self.sensors for reg in sensor.registers}
+
+    @property
+    def setting_registers(self) -> set[int]:
+        return {control.register for control in self.controls} | set(self.rated_power)
 
 
 def _words(regs: dict[int, int], addresses: tuple[int, ...]) -> int:
@@ -215,7 +256,7 @@ def status(state: int, alarm: tuple[int, ...], fault: tuple[int, ...],
 
 
 def bms(base: int, *, current_scale: float = 1) -> tuple[RegisterSensor, ...]:
-    return (
+    sensors = (
         volts("bms_charge_voltage", "BMS charge voltage", base, scale=0.01),
         volts("bms_discharge_voltage", "BMS discharge voltage", base + 1, scale=0.01),
         amps("bms_charge_current_limit", "BMS charge current limit", base + 2, scale=1,
@@ -231,6 +272,7 @@ def bms(base: int, *, current_scale: float = 1) -> tuple[RegisterSensor, ...]:
         amps("bms_max_discharge_current", "BMS max discharge current", base + 9, scale=1,
              kind=Kind.U16, enabled=False),
     )
+    return tuple(replace(sensor, enabled=False) for sensor in sensors)
 
 
 IDENTITY = (
@@ -285,6 +327,68 @@ def battery_sensor(index: int, key: str) -> RegisterSensor:
     return next(sensor for sensor in battery_sensors(index) if sensor.key == key)
 
 
+def control_value(control: Control, regs: dict[int, int]) -> int | None:
+    """The control's raw field: its register with the mask applied and shifted down."""
+    raw = regs.get(control.register)
+    if raw is None:
+        return None
+    shift = (control.mask & -control.mask).bit_length() - 1
+    return (raw & control.mask) >> shift
+
+
+def with_control_value(control: Control, current: int, value: int) -> int:
+    shift = (control.mask & -control.mask).bit_length() - 1
+    return (current & ~control.mask & 0xFFFF) | (value << shift & control.mask)
+
+
+def rated_power(family: Family, regs: dict[int, int]) -> float | None:
+    if not family.rated_power:
+        return None
+    try:
+        return _words(regs, family.rated_power) * 0.1
+    except KeyError:
+        return None
+
+
+TOU_SLOTS = 6
+
+
+def _current(key, name, reg, **kw) -> Control:
+    return Control(key=key, name=name, register=reg, platform=ControlPlatform.NUMBER, maximum=240,
+                   unit=AMP, device_class="current", **kw)
+
+
+def _soc(key, name, reg, **kw) -> Control:
+    return Control(key=key, name=name, register=reg, platform=ControlPlatform.NUMBER,
+                   slider=True, unit=PERCENTAGE, device_class="battery", **kw)
+
+
+def tou_controls(time: int, power: int, voltage: int, soc: int, charge: int
+                 ) -> tuple[Control, ...]:
+    controls: list[Control] = []
+    for i in range(TOU_SLOTS):
+        n = i + 1
+        controls += [
+            Control(key=f"tou{n}_time", name=f"TOU slot {n} time", register=time + i,
+                    platform=ControlPlatform.TIME, tou_slot=i),
+            _soc(f"tou{n}_soc", f"TOU slot {n} SOC", soc + i, tou_slot=i),
+            Control(key=f"tou{n}_power", name=f"TOU slot {n} power", register=power + i,
+                    platform=ControlPlatform.NUMBER, maximum=None, step=10, slider=True, unit=W,
+                    device_class="power", enabled=False, tou_slot=i),
+            Control(key=f"tou{n}_voltage", name=f"TOU slot {n} voltage",
+                    register=voltage + i, platform=ControlPlatform.NUMBER, scale=0.01,
+                    maximum=65, step=0.1, unit=VOLT, device_class="voltage",
+                    enabled=False, tou_slot=i),
+            Control(key=f"tou{n}_grid_charge", name=f"TOU slot {n} grid charge",
+                    register=charge + i, platform=ControlPlatform.SWITCH, mask=0x0001,
+                    enabled=False, tou_slot=i),
+            Control(key=f"tou{n}_generator_charge", name=f"TOU slot {n} generator charge",
+                    register=charge + i, platform=ControlPlatform.SWITCH, mask=0x0002,
+                    enabled=False, tou_slot=i),
+        ]
+    return tuple(controls)
+
+
 # SUN-*K-SG0*LP1
 SINGLE_PHASE = Family(
     key="single_phase_hybrid",
@@ -336,6 +440,43 @@ SINGLE_PHASE = Family(
         energy("today_production", "Today PV production", 0x006C),
         energy("total_production", "Total PV production", 0x0060, 0x0061),
         *bms(0x0138),
+    ),
+    rated_power=(0x0010, 0x0011),
+    controls=(
+        _current("max_charge_current", "Battery max charge current", 0x00D2, config=False),
+        _current("max_discharge_current", "Battery max discharge current", 0x00D3,
+                 config=False, enabled=False),
+        _current("grid_charge_current", "Grid charge current", 0x00E6, config=False),
+        _soc("shutdown_soc", "Battery shutdown SOC", 0x00D9),
+        _soc("restart_soc", "Battery restart SOC", 0x00DA),
+        _soc("low_soc", "Battery low SOC", 0x00DB, enabled=False),
+        _soc("grid_charge_start_soc", "Grid charge start SOC", 0x00E5, enabled=False),
+        Control(key="grid_charge", name="Grid charge", register=0x00E8,
+                platform=ControlPlatform.SWITCH),
+        Control(key="generator_charge", name="Generator charge", register=0x00E7,
+                platform=ControlPlatform.SWITCH, enabled=False),
+        Control(key="energy_pattern", name="Energy pattern", register=0x00F3,
+                platform=ControlPlatform.SELECT, config=False,
+                options={0: "battery_first", 1: "load_first"}),
+        Control(key="max_sell_power", name="Max sell power", register=0x00F5,
+                platform=ControlPlatform.NUMBER, maximum=None, step=10, slider=True,
+                unit=W, device_class="power", enabled=False),
+        Control(key="zero_export_power", name="Zero export power", register=0x00CE,
+                platform=ControlPlatform.NUMBER, maximum=1000, unit=W,
+                device_class="power", enabled=False),
+        Control(key="grid_peak_shaving", name="Grid peak shaving", register=0x0118,
+                platform=ControlPlatform.SWITCH, mask=0x0100, enabled=False),
+        Control(key="grid_peak_shaving_power", name="Grid peak shaving power",
+                register=0x0125, platform=ControlPlatform.NUMBER, maximum=30000, step=10,
+                unit=W, device_class="power", enabled=False),
+        Control(key="work_mode", name="Work mode", register=0x00F4,
+                platform=ControlPlatform.SELECT,
+                options={0: "selling_first", 1: "zero_export_to_load",
+                         2: "zero_export_to_ct"}),
+        Control(key="time_of_use", name="Time of use", register=0x00F8,
+                platform=ControlPlatform.SWITCH, mask=0x0001),
+        *tou_controls(time=0x00FA, power=0x0100, voltage=0x0106, soc=0x010C,
+                      charge=0x0112),
     ),
 )
 

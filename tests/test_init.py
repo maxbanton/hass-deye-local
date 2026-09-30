@@ -193,7 +193,7 @@ async def test_battery_modules_become_devices(hass: HomeAssistant) -> None:
     devices = _battery_devices(hass)
     assert set(devices) == {BATTERY_1, BATTERY_2}
     assert all(device.via_device_id == inverter.id for device in devices.values())
-    assert hass.states.get("sensor.deye_single_phase_hybrid_bms_soc") is not None
+    assert hass.states.get("sensor.deye_single_phase_hybrid_battery_soc") is not None
 
     assert hass.states.get("sensor.deye_battery_1_soc").state == "87.6"
     assert hass.states.get("sensor.deye_battery_1_current").state == "-4.0"

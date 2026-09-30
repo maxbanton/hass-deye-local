@@ -12,15 +12,26 @@ from homeassistant.components import bluetooth
 from homeassistant.components.bluetooth import BluetoothServiceInfoBleak
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
-from .const import BATTERY_SCAN_INTERVAL, DOMAIN, MAX_BLOCK, STALE_TIMEOUT
+from .const import (
+    BATTERY_SCAN_INTERVAL,
+    DOMAIN,
+    MAX_BLOCK,
+    SETTINGS_INTERVAL,
+    STALE_TIMEOUT,
+    WRITE_VERIFY_DELAY,
+    WRITE_VERIFY_TIMEOUT,
+)
 from .models import (
     IDENTITY_BLOCK,
     MAX_BATTERIES,
+    Control,
     Family,
     battery_sensors,
     battery_serial_block,
+    with_control_value,
 )
 from .protocol import decode_ascii, plan_blocks
 from .transport import DeyeTransport, RegisterUnavailable, TransportError
@@ -52,6 +63,9 @@ class DeyeLocalCoordinator(DataUpdateCoordinator[dict[int, int]]):
         self.keep_connected = keep_connected
         self.transport = DeyeTransport(device)
         self.blocks = plan_blocks(family.registers, MAX_BLOCK) or [IDENTITY_BLOCK]
+        self.settings_blocks = plan_blocks(family.setting_registers, MAX_BLOCK)
+        self._settings: dict[int, int] = {}
+        self._last_settings_read: float | None = None
         self.inverter_device_id: str | None = None
         # Battery module serial -> slot index.
         self.battery_slots: dict[str, int] = {}
@@ -89,7 +103,10 @@ class DeyeLocalCoordinator(DataUpdateCoordinator[dict[int, int]]):
                 await self.transport.async_connect()
                 if self._battery_scan_due():
                     await self._async_scan_batteries()
-                snapshot = await self._async_read_blocks()
+                if self._settings_due():
+                    self._settings = await self._async_read(self.settings_blocks)
+                    self._last_settings_read = time.monotonic()
+                snapshot = {**self._settings, **await self._async_read(self.blocks)}
             except TransportError as err:
                 self.last_error = str(err)
                 await self.transport.async_disconnect()
@@ -104,9 +121,15 @@ class DeyeLocalCoordinator(DataUpdateCoordinator[dict[int, int]]):
         self.last_error = None
         return snapshot
 
-    async def _async_read_blocks(self) -> dict[int, int]:
+    def _settings_due(self) -> bool:
+        if not self.settings_blocks:
+            return False
+        last = self._last_settings_read
+        return last is None or time.monotonic() - last >= SETTINGS_INTERVAL
+
+    async def _async_read(self, blocks: list[tuple[int, int]]) -> dict[int, int]:
         snapshot: dict[int, int] = {}
-        for start, count in self.blocks:
+        for start, count in blocks:
             try:
                 values = await self.transport.async_read(start, count)
             except RegisterUnavailable:
@@ -153,6 +176,53 @@ class DeyeLocalCoordinator(DataUpdateCoordinator[dict[int, int]]):
             for index in slots.values():
                 registers.update(r for s in battery_sensors(index) for r in s.registers)
             self.blocks = plan_blocks(registers, MAX_BLOCK)
+
+    async def async_write_control(self, control: Control, value: int) -> None:
+        """Write one control and confirm the inverter kept it.
+
+        The register is read first so that bits outside the control, and changes
+        made on the inverter since the last poll, are preserved.
+        """
+        register = control.register
+        async with self._session_lock:
+            try:
+                await self.transport.async_connect()
+                (current,) = await self.transport.async_read(register, 1)
+                target = with_control_value(control, current, value)
+                if target != current:
+                    _LOGGER.debug(
+                        "Writing %s: register %#06x %d -> %d",
+                        control.key, register, current, target,
+                    )
+                    await self.transport.async_write(register, [target])
+                    current = await self._async_read_back(register, target)
+            except TransportError as err:
+                await self.transport.async_disconnect()
+                raise HomeAssistantError(
+                    translation_domain=DOMAIN,
+                    translation_key="write_failed",
+                    translation_placeholders={"name": control.name, "error": str(err)},
+                ) from err
+            finally:
+                if not self.keep_connected:
+                    await self.transport.async_disconnect()
+        self._settings[register] = current
+        if self.data is not None:
+            self.async_set_updated_data({**self.data, register: current})
+        if current != target:
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="write_not_applied",
+                translation_placeholders={"name": control.name},
+            )
+
+    async def _async_read_back(self, register: int, target: int) -> int:
+        deadline = time.monotonic() + WRITE_VERIFY_TIMEOUT
+        while True:
+            (value,) = await self.transport.async_read(register, 1)
+            if value == target or time.monotonic() >= deadline:
+                return value
+            await asyncio.sleep(WRITE_VERIFY_DELAY)
 
     async def async_dump(self) -> dict[str, Any]:
         """Sweep the dump ranges; stop at the first failure that is not a missing register."""
