@@ -1,5 +1,12 @@
 # Deye Local for Home Assistant
 
+[![HACS](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://hacs.xyz)
+[![Release](https://img.shields.io/github/v/release/maxbanton/hass-deye-local)](https://github.com/maxbanton/hass-deye-local/releases)
+[![Tests](https://github.com/maxbanton/hass-deye-local/actions/workflows/tests.yml/badge.svg)](https://github.com/maxbanton/hass-deye-local/actions/workflows/tests.yml)
+[![Validate](https://github.com/maxbanton/hass-deye-local/actions/workflows/validate.yml/badge.svg)](https://github.com/maxbanton/hass-deye-local/actions/workflows/validate.yml)
+[![License](https://img.shields.io/github/license/maxbanton/hass-deye-local)](LICENSE)
+[![Home Assistant](https://img.shields.io/badge/Home%20Assistant-2025.3%2B-41BDF5.svg)](https://www.home-assistant.io)
+
 Home Assistant integration for Deye hybrid inverters that reads the inverter
 locally over Bluetooth, through the WiBLE data logger that is already plugged
 into it. No cloud, no internet, no extra wiring.
@@ -107,8 +114,8 @@ picks the matching register map.
 
 | Family | Models | Status |
 |--------|--------|--------|
-| Single phase hybrid | SUN-*K-SG0*LP1, for example SUN-3.6K-SG03LP1-EU, SUN-6K-SG05LP1-EU, SUN-8K-SG01LP1-EU | Supported, verified on a SUN-6K-SG05LP1-EU-AM2-P |
-| Three phase hybrid, low and high voltage | SUN-*K-SG0*LP3 and SUN-*K-SG0*HP3, for example SUN-12K-SG04LP3-EU, SUN-10K-SG01HP3-EU-AM2 | Experimental |
+| Single phase hybrid | `SUN-*K-SG0*LP1`, for example SUN-3.6K-SG03LP1-EU, SUN-6K-SG05LP1-EU, SUN-8K-SG01LP1-EU | Supported, verified on a SUN-6K-SG05LP1-EU-AM2-P |
+| Three phase hybrid, low and high voltage | `SUN-*K-SG0*LP3` and `SUN-*K-SG0*HP3`, for example SUN-12K-SG04LP3-EU, SUN-10K-SG01HP3-EU-AM2 | Experimental |
 | String, micro, high voltage three phase, off grid | | Recognised, not mapped yet |
 
 Any regional or variant suffix (`-EU`, `-US`, `-AM2`, `-P` and so on) belongs to the
@@ -125,6 +132,10 @@ its type and identity, so you can download the diagnostics and help add it (see
 below).
 
 ## Installation (HACS)
+
+[![Open your Home Assistant instance and open this repository in HACS.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=maxbanton&repository=hass-deye-local&category=integration)
+
+Or manually:
 
 1. In HACS, open the three-dot menu and choose **Custom repositories**.
 2. Add `https://github.com/maxbanton/hass-deye-local` with category **Integration**.
