@@ -107,9 +107,12 @@ picks the matching register map.
 
 | Family | Models | Status |
 |--------|--------|--------|
-| Single phase hybrid | SUN-*K-SG0*LP1 | Supported, verified on hardware |
-| Three phase hybrid, low and high voltage | SUN-*K-SG0*LP3, SUN-*K-SG0*HP3 | Experimental |
+| Single phase hybrid | SUN-*K-SG0*LP1, for example SUN-3.6K-SG03LP1-EU, SUN-6K-SG05LP1-EU, SUN-8K-SG01LP1-EU | Supported, verified on a SUN-6K-SG05LP1-EU-AM2-P |
+| Three phase hybrid, low and high voltage | SUN-*K-SG0*LP3 and SUN-*K-SG0*HP3, for example SUN-12K-SG04LP3-EU, SUN-10K-SG01HP3-EU-AM2 | Experimental |
 | String, micro, high voltage three phase, off grid | | Recognised, not mapped yet |
+
+Any regional or variant suffix (`-EU`, `-US`, `-AM2`, `-P` and so on) belongs to the
+same family as the base model.
 
 **Experimental** means the register map follows Deye's protocol documents and
 two independent open source implementations, but has not been confirmed on real
