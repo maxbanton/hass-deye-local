@@ -1,0 +1,8 @@
+line-length = 100
+target-version = "py312"
+
+[lint]
+select = ["E", "F", "W", "I", "UP", "B", "SIM", "RET", "C4"]
+
+[lint.isort]
+known-first-party = ["custom_components"]

@@ -1,0 +1,77 @@
+{
+  "config": {
+    "flow_title": "{name}",
+    "step": {
+      "user": {
+        "title": "Deye Local",
+        "description": "Pick the Deye data logger to connect to. Only loggers that Home Assistant can currently hear over Bluetooth are listed.",
+        "data": {
+          "address": "Data logger"
+        }
+      },
+      "bluetooth_confirm": {
+        "title": "Deye Local",
+        "description": "Set up the Deye data logger {logger}? Home Assistant will connect to it once to read the inverter's model and serial number."
+      },
+      "identify": {
+        "title": "Deye Local",
+        "description": "Could not read the inverter through logger {logger}. Make sure it is in range of a Bluetooth adapter or an ESPHome Bluetooth proxy, and that the Deye app is not connected to it over Bluetooth. Submit to try again."
+      },
+      "confirm": {
+        "title": "Deye Local",
+        "description": "Logger {logger} is connected to a **{model}** inverter (serial {serial}).\n\n{support}\n\nThe logger accepts one Bluetooth connection at a time: while Home Assistant is connected, the Deye app can only use its cloud mode. To use the app's Bluetooth mode, disable this integration entry for a while."
+      }
+    },
+    "error": {
+      "cannot_connect": "Could not connect to the data logger."
+    },
+    "abort": {
+      "already_configured": "This data logger is already configured.",
+      "no_devices_found": "No Deye data logger was found over Bluetooth. You need a Bluetooth adapter or an ESPHome Bluetooth proxy within range of the logger."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Connection",
+        "description": "The logger serves values from a cache that refreshes every few seconds, so 10 seconds is the fastest useful interval. Longer intervals mean fewer database writes.\n\nKeeping the connection open is the most reliable. If your logger stops uploading to the Deye Cloud while Home Assistant is connected, turn it off: the integration then connects for each poll and releases the logger in between.",
+        "data": {
+          "scan_interval": "Poll interval (seconds)",
+          "keep_connected": "Keep the Bluetooth connection open"
+        }
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "device_state": {
+        "name": "Device state",
+        "state": {
+          "standby": "Standby",
+          "self_test": "Self test",
+          "normal": "Normal",
+          "alarm": "Alarm",
+          "fault": "Fault"
+        }
+      },
+      "signal_strength": {
+        "name": "Signal strength"
+      }
+    }
+  },
+  "exceptions": {
+    "not_in_range": {
+      "message": "Data logger {address} is not in range of any Bluetooth adapter or proxy."
+    }
+  },
+  "issues": {
+    "experimental": {
+      "title": "{model} support is experimental",
+      "description": "The register map for this inverter family has not been confirmed on real hardware yet. Values are read only. If any look wrong, download the diagnostics from the device page (they include a register dump) and open an issue at {url}."
+    },
+    "unsupported": {
+      "title": "{model} is not supported yet",
+      "description": "Deye Local does not have a register map for this inverter yet, so only its identity is shown. Download the diagnostics from the device page (they include a register dump) and open an issue at {url} to help add it."
+    }
+  }
+}

@@ -1,0 +1,44 @@
+name: Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: pip install ruff
+      - run: ruff check .
+
+  test:
+    name: test (${{ matrix.home-assistant }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - home-assistant: latest
+            framework: pytest-homeassistant-custom-component
+          # Oldest supported release (hacs.json): Home Assistant 2025.3.0
+          - home-assistant: "2025.3.0"
+            framework: pytest-homeassistant-custom-component==0.13.221
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements_test.txt "${{ matrix.framework }}"
+      - name: Install Home Assistant's Bluetooth dependencies
+        run: |
+          python -c "import json, pathlib, homeassistant.components as c; base = pathlib.Path(c.__file__).parent; print('\n'.join(r for n in ('bluetooth', 'usb') for r in json.loads((base / n / 'manifest.json').read_text())['requirements']))" > bluetooth_requirements.txt
+          pip install -r bluetooth_requirements.txt
+      - run: pytest -q
