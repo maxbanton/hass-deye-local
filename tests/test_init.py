@@ -66,11 +66,15 @@ def transport() -> FakeTransport:
     return FakeTransport.instances[-1]
 
 
-async def _setup(hass: HomeAssistant, device_type: int = 3) -> MockConfigEntry:
+async def _setup(
+    hass: HomeAssistant, device_type: int = 3, options: dict | None = None
+) -> MockConfigEntry:
     entry = MockConfigEntry(
         domain=DOMAIN,
         unique_id=ADDRESS,
         data={CONF_ADDRESS: ADDRESS, CONF_DEVICE_TYPE: device_type, CONF_SERIAL: "2603125693"},
+        options=options or {},
+        minor_version=2,
     )
     entry.add_to_hass(hass)
     await hass.config_entries.async_setup(entry.entry_id)
@@ -90,16 +94,9 @@ async def test_setup_reads_the_mapped_registers(hass: HomeAssistant) -> None:
     assert all(count <= 16 for _, count in transport().reads)
 
 
-async def test_per_poll_mode_releases_the_logger_between_polls(hass: HomeAssistant) -> None:
-    entry = MockConfigEntry(
-        domain=DOMAIN,
-        unique_id=ADDRESS,
-        data={CONF_ADDRESS: ADDRESS, CONF_DEVICE_TYPE: 3, CONF_SERIAL: "2603125693"},
-        options={CONF_KEEP_CONNECTED: False},
-    )
-    entry.add_to_hass(hass)
-    await hass.config_entries.async_setup(entry.entry_id)
-    await hass.async_block_till_done()
+async def test_default_releases_the_logger_between_polls(hass: HomeAssistant) -> None:
+    entry = await _setup(hass)
+    assert entry.runtime_data.update_interval.total_seconds() == 30
     fake = transport()
     assert not fake.connected
     await entry.runtime_data.async_refresh()
@@ -108,9 +105,37 @@ async def test_per_poll_mode_releases_the_logger_between_polls(hass: HomeAssista
 
 
 async def test_persistent_mode_keeps_one_session(hass: HomeAssistant) -> None:
-    entry = await _setup(hass)
+    entry = await _setup(hass, options={CONF_KEEP_CONNECTED: True})
     await entry.runtime_data.async_refresh()
     assert (transport().connects, transport().disconnects) == (1, 0)
+
+
+@pytest.mark.parametrize(
+    ("stored", "migrated"),
+    [
+        ({}, {}),
+        ({CONF_SCAN_INTERVAL: 10, CONF_KEEP_CONNECTED: True}, {}),
+        ({CONF_SCAN_INTERVAL: 10, CONF_KEEP_CONNECTED: False}, {}),
+        ({CONF_SCAN_INTERVAL: 120, CONF_KEEP_CONNECTED: True}, {CONF_SCAN_INTERVAL: 120}),
+    ],
+)
+async def test_migration_moves_entries_to_per_poll_mode(
+    hass: HomeAssistant, stored: dict, migrated: dict
+) -> None:
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        unique_id=ADDRESS,
+        data={CONF_ADDRESS: ADDRESS, CONF_DEVICE_TYPE: 3, CONF_SERIAL: "2603125693"},
+        options=stored,
+        minor_version=1,
+    )
+    entry.add_to_hass(hass)
+    await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    assert entry.state is ConfigEntryState.LOADED
+    assert entry.minor_version == 2
+    assert dict(entry.options) == migrated
+    assert not entry.runtime_data.keep_connected
 
 
 async def test_signal_strength_reports_the_link(hass: HomeAssistant) -> None:

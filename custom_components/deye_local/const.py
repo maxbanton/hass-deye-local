@@ -14,16 +14,18 @@ CONF_DEVICE_TYPE = "device_type"
 CONF_SERIAL = "serial"
 
 # The logger answers reads from a cache the inverter refreshes every few seconds,
-# so polling faster than this only adds Bluetooth traffic and database writes.
+# so polling faster than the minimum only adds Bluetooth traffic and database
+# writes. The default leaves room for a reconnect on every poll.
 CONF_SCAN_INTERVAL = "scan_interval"
-DEFAULT_SCAN_INTERVAL = 10  # seconds
+DEFAULT_SCAN_INTERVAL = 30  # seconds
 MIN_SCAN_INTERVAL = 10
 MAX_SCAN_INTERVAL = 300
 
-# Some loggers stop uploading to the cloud while a Bluetooth session stays open;
-# turning this off connects for each poll and releases the logger in between.
+# While a Bluetooth session stays open the logger stops uploading inverter data
+# to the Deye Cloud, so by default the integration connects for each poll and
+# releases the logger in between.
 CONF_KEEP_CONNECTED = "keep_connected"
-DEFAULT_KEEP_CONNECTED = True
+DEFAULT_KEEP_CONNECTED = False
 
 # How long last good values survive failed polls, so one dropped exchange does
 # not blank every entity.

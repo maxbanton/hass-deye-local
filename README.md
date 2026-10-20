@@ -36,8 +36,9 @@ than a Bluetooth adapter or an ESPHome Bluetooth proxy in range.
 ## What it gives you
 
 - **Near real time data.** The logger answers from a cache the inverter refreshes
-  every few seconds; values arrive 4 to 11 seconds old (6 seconds typically),
-  compared with 3 to 5 minutes through the cloud.
+  every few seconds. Values update every 30 seconds by default, or every 10
+  seconds with the connection kept open, compared with 3 to 5 minutes through
+  the cloud.
 - **Works without the internet.** Useful exactly when the grid or the connection
   is down.
 - **Inverter state, alarms and fault codes.** A fault such as `F13` (working mode
@@ -103,13 +104,16 @@ proxy also needs decent Wi-Fi, so check its signal after placing it.
 
 ### One connection at a time
 
-The logger accepts a single Bluetooth connection. While Home Assistant is
-connected, the Deye app can still use the cloud as usual, but its local
-Bluetooth mode cannot connect. When you need the app's Bluetooth mode on site,
-disable the Deye Local entry (**Settings > Devices & Services > Deye Local**,
-three-dot menu, **Disable**), which releases the logger, and enable it again
-afterwards. The logger keeps uploading to the Deye Cloud over Wi-Fi either way
-(verified over a continuous 15 hour session with no upload gaps).
+The logger accepts a single Bluetooth connection, and while that connection
+stays open it stops uploading inverter data to the Deye Cloud: the logger still
+shows as online, but the inverter and battery values in the cloud and the Deye
+app freeze until the connection closes. That is why the integration connects for
+each poll and releases the logger in between by default (see [Options](#options)).
+
+The Deye app's local Bluetooth mode needs the logger to itself. When you need it
+on site, disable the Deye Local entry (**Settings > Devices & Services > Deye
+Local**, three-dot menu, **Disable**), which releases the logger, and enable it
+again afterwards.
 
 ## Supported inverters
 
@@ -119,15 +123,15 @@ picks the matching register map.
 | Family | Models | Status |
 |--------|--------|--------|
 | Single phase hybrid | `SUN-*K-SG0*LP1`, for example SUN-3.6K-SG03LP1-EU, SUN-6K-SG05LP1-EU, SUN-8K-SG01LP1-EU | Supported, verified on a SUN-6K-SG05LP1-EU-AM2-P |
-| Three phase hybrid, low and high voltage | `SUN-*K-SG0*LP3` and `SUN-*K-SG0*HP3`, for example SUN-12K-SG04LP3-EU, SUN-10K-SG01HP3-EU-AM2 | Experimental |
+| Three phase hybrid, low and high voltage | `SUN-*K-SG0*LP3` and `SUN-*K-SG0*HP3`, for example SUN-12K-SG04LP3-EU, SUN-10K-SG01HP3-EU-AM2 | Experimental, reported working on a SUN-10K-SG05LP3-EU-SM2 |
 | String, micro, high voltage three phase, off grid | | Recognised, not mapped yet |
 
 Any regional or variant suffix (`-EU`, `-US`, `-AM2`, `-P` and so on) belongs to the
 same family as the base model.
 
 **Experimental** means the register map follows Deye's protocol documents and
-two independent open source implementations, but has not been confirmed on real
-hardware by this project yet.
+two independent open source implementations, and user reports confirm it, but it
+has not been verified on hardware by this project yet.
 Values are read only (no settings are exposed), and a repair notice asks you to
 report anything that looks wrong.
 
@@ -159,20 +163,22 @@ Under **Settings > Devices & Services > Deye Local > Configure**:
 
 | Option | Default | Range |
 |--------|---------|-------|
-| Poll interval | 10 s | 10 to 300 s |
-| Keep the Bluetooth connection open | On | On or off |
+| Poll interval | 30 s | 10 to 300 s |
+| Keep the Bluetooth connection open | Off | On or off |
 
-The logger's cache refreshes every few seconds, so 10 seconds is the fastest
-useful interval. Each poll reads every mapped register in small blocks over the
-existing connection, which takes about 2 to 4 seconds depending on how many
-battery modules there are.
+By default the integration connects for each poll, reads every mapped register
+in small blocks and disconnects again, so the logger keeps uploading to the Deye
+Cloud. Connecting is the slowest and least reliable part of a Bluetooth
+exchange, which is why the default interval is 30 seconds; an occasional poll
+that fails to connect is retried on the next one, and the last values are kept
+meanwhile.
 
-Keeping the connection open avoids reconnecting, which is the slowest and least
-reliable part of a Bluetooth exchange. Some users report loggers that stop
-uploading to the Deye Cloud while a session stays open; if yours does, turn the
-option off and the integration connects for each poll and releases the logger in
-between. Expect slower polls and the occasional failed connection in that mode,
-so a longer poll interval (30 to 60 seconds) suits it better.
+Turn **Keep the Bluetooth connection open** on if you do not use the Deye Cloud
+or the Deye app away from home. Polls then skip the reconnect and take about 2
+to 4 seconds, depending on how many battery modules there are, and since the
+logger's cache refreshes every few seconds, 10 seconds becomes a useful
+interval. The inverter and battery values in the Deye Cloud stop updating for as
+long as the connection stays open.
 
 ## Devices and entities
 
@@ -200,7 +206,7 @@ from the entity settings.
 Power and current are signed: battery power and current are negative while the
 battery charges; grid power is positive while importing.
 
-At a 10 second interval power values change on almost every poll. If your
+At short intervals power values change on almost every poll. If your
 database grows more than you like, exclude the high frequency sensors you do not
 need from the recorder, or raise the poll interval.
 
@@ -280,9 +286,10 @@ If your inverter is experimental or not mapped yet:
 ## Relation to Deye Cloud
 
 [Deye Cloud](https://github.com/maxbanton/hass-deye-cloud) reads the same
-inverter through Deye's official cloud API. The two run side by side without
-interfering: the logger serves this integration over Bluetooth and keeps
-uploading to the cloud over Wi-Fi. The cloud remains useful for access away from
+inverter through Deye's official cloud API. The two run side by side as long as
+Deye Local releases the logger between polls (the default): the logger serves
+this integration over Bluetooth and keeps uploading to the cloud over Wi-Fi.
+With the connection kept open, the cloud's inverter values stop updating. The cloud remains useful for access away from
 home, for station level figures the cloud computes, and for daily totals that
 survive an inverter restart (the inverter resets its own daily counters when it
 powers up).

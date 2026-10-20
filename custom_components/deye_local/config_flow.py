@@ -83,6 +83,7 @@ class DeyeLocalConfigFlow(ConfigFlow, domain=DOMAIN):
     """Set up a Deye inverter through its WiBLE logger."""
 
     VERSION = 1
+    MINOR_VERSION = 2
 
     def __init__(self) -> None:
         self._info: BluetoothServiceInfoBleak | None = None

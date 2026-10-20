@@ -104,6 +104,22 @@ async def async_setup_entry(hass: HomeAssistant, entry: DeyeLocalConfigEntry) ->
     return True
 
 
+async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+    if entry.version > 1:
+        return False
+    if entry.minor_version < 2:
+        # 1.1 kept the session open by default, which stops the logger's cloud
+        # uploads. Stored values only exist because the options form saves every
+        # field, so drop them and let the new defaults apply; a deliberately
+        # slower poll interval stays.
+        options = dict(entry.options)
+        options.pop(CONF_KEEP_CONNECTED, None)
+        if options.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL) < DEFAULT_SCAN_INTERVAL:
+            del options[CONF_SCAN_INTERVAL]
+        hass.config_entries.async_update_entry(entry, options=options, minor_version=2)
+    return True
+
+
 async def _async_reload(hass: HomeAssistant, entry: DeyeLocalConfigEntry) -> None:
     await hass.config_entries.async_reload(entry.entry_id)
 

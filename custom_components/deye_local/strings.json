@@ -34,7 +34,7 @@
     "step": {
       "init": {
         "title": "Connection",
-        "description": "The logger serves values from a cache that refreshes every few seconds, so 10 seconds is the fastest useful interval. Longer intervals mean fewer database writes.\n\nKeeping the connection open is the most reliable. If your logger stops uploading to the Deye Cloud while Home Assistant is connected, turn it off: the integration then connects for each poll and releases the logger in between.",
+        "description": "The logger serves values from a cache that refreshes every few seconds. Longer intervals mean fewer database writes.\n\nBy default the integration connects for each poll and releases the logger in between, because the logger stops uploading inverter data to the Deye Cloud while a connection stays open. Keep the connection open only if you do not use the Deye Cloud or the Deye app away from home; polls are then faster and more reliable, and 10 seconds becomes a useful interval.",
         "data": {
           "scan_interval": "Poll interval (seconds)",
           "keep_connected": "Keep the Bluetooth connection open"
