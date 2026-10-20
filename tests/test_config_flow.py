@@ -30,7 +30,7 @@ SINGLE_PHASE = Identity(device_type=0x0003, serial="2603125693")
 
 
 @pytest.fixture(autouse=True)
-def auto_enable_custom_integrations(enable_custom_integrations):
+def auto_enable_custom_integrations(enable_custom_integrations, enable_bluetooth):
     return
 
 
