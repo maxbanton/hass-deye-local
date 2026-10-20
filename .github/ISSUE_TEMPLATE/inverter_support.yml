@@ -1,0 +1,51 @@
+name: Inverter support
+description: Your inverter is experimental or not mapped yet, and you want to help add it.
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Setup succeeds on any Deye inverter the logger can reach, even one that is
+        not mapped yet. The diagnostics file holds a dump of its data registers,
+        which is what it takes to map a new family.
+
+        **Settings > Devices & Services > Deye Local**, three-dot menu on the entry,
+        **Download diagnostics**. Serial numbers and Bluetooth addresses are removed
+        from it, so it is safe to attach here.
+  - type: input
+    id: model
+    attributes:
+      label: Inverter model
+      description: As printed on the label, for example SUN-10K-SG05LP3-EU-SM2.
+    validations:
+      required: true
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Diagnostics
+      description: Drag the downloaded .json file into this box.
+      placeholder: Drop the diagnostics file here.
+    validations:
+      required: true
+  - type: textarea
+    id: reference
+    attributes:
+      label: Reference values
+      description: >
+        What the inverter screen or the Deye app shows at about the moment you
+        downloaded the diagnostics, so the register map can be checked against it.
+      value: |
+        Battery SOC:
+        Battery voltage:
+        Grid voltage:
+        PV power:
+        Today's energy:
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Integration version
+      description: Shown in HACS.
+    validations:
+      required: true

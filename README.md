@@ -281,7 +281,7 @@ If your inverter is experimental or not mapped yet:
    Bluetooth addresses are removed from it, so it is safe to attach publicly.
 2. Note a few values the inverter or the Deye app shows at the same moment
    (battery SOC, battery voltage, grid voltage, today's energy).
-3. Open an [issue](https://github.com/maxbanton/hass-deye-local/issues) with both.
+3. Open an [Inverter support issue](https://github.com/maxbanton/hass-deye-local/issues/new?template=inverter_support.yml) with both.
 
 ## Relation to Deye Cloud
 

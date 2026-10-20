@@ -1,0 +1,22 @@
+name: Feature request
+description: Suggest a new entity, setting or improvement.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: request
+    attributes:
+      label: What you would like
+    validations:
+      required: true
+  - type: textarea
+    id: use-case
+    attributes:
+      label: What you would use it for
+      description: The automation or situation behind the request.
+    validations:
+      required: true
+  - type: input
+    id: model
+    attributes:
+      label: Inverter model
+      description: As printed on the label, for example SUN-6K-SG05LP1-EU.
