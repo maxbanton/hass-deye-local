@@ -291,6 +291,11 @@ type: custom:deye-local-tou-card
 `device` picks the inverter when you have more than one, and `title` replaces the
 heading. Both can be set in the card editor.
 
+The card is loaded when Home Assistant's page loads. After installing or
+updating the integration, reload the page in the browser; in the Home Assistant
+app, close the app completely and open it again (pulling to refresh is not
+enough). Until then the card shows a configuration error.
+
 - Changes are collected until you press **Save**, then written with
   `deye_local.set_tou_schedule`. Only the fields you changed are sent, so a
   change made on the inverter's screen in the meantime is kept. **Discard**
