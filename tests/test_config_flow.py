@@ -153,3 +153,22 @@ async def test_logger_without_a_name_gets_a_readable_label(hass: HomeAssistant) 
     # Passive scanners never see the scan response that carries the logger's name.
     result = await _discover(hass, info=service_info(name=ADDRESS))
     assert result["description_placeholders"]["logger"] == f"Deye data logger {ADDRESS}"
+
+
+async def test_identify_reads_the_model_and_serial_and_lets_go() -> None:
+    from custom_components.deye_local.config_flow import async_identify
+
+    from .common import FakeTransport, service_info
+    from .snapshot import SERIAL_WORDS
+
+    class Logger(FakeTransport):
+        def __init__(self, device) -> None:
+            super().__init__(device)
+            self.registers.update(zip(range(3, 8), SERIAL_WORDS, strict=True))
+
+    FakeTransport.instances.clear()
+    with patch("custom_components.deye_local.config_flow.DeyeTransport", Logger):
+        identity = await async_identify(service_info())
+    assert identity.device_type == 3
+    assert identity.serial == "2603125693"
+    assert not FakeTransport.instances[-1].connected

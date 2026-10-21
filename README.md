@@ -249,6 +249,79 @@ How changes work:
 Change settings with care: they control how the inverter charges and discharges
 the battery and uses the grid.
 
+## Actions
+
+### `deye_local.set_tou_schedule`
+
+Changes several time of use slots in one write, the way the inverter's own Time
+Of Use screen saves the whole table. It is faster than changing the slot entities
+one by one, and start times can move past each other's old values (each entity
+change has to stay between its neighbours).
+
+| Field | Description |
+|-------|-------------|
+| `device_id` | The inverter. Can be left out when only one is set up. |
+| `slots` | Exactly 6 entries, slot 1 to 6. Each can set `time` (HH:MM, when the slot starts), `power` (W), `batt` (target SOC, %), `grid_charge`, `gen` (true/false) and `voltage` (V). |
+
+A field you leave out, or an empty slot `{}`, keeps what the inverter holds at
+the moment of the write, so a change made on the inverter's screen since the last
+settings read is not undone. Start times are checked against the result: they
+have to increase from slot 1 to slot 6. Only the registers that change are
+written, then read back like any other setting.
+
+The field names match the `deye_cloud.set_tou_schedule` action of the
+[Deye Cloud](https://github.com/maxbanton/hass-deye-cloud) integration.
+
+## Time Of Use card
+
+The integration includes a dashboard card that lays out the time of use table
+like the inverter's Work Mode screen and saves your changes in one write. There
+is nothing extra to install: Home Assistant loads the card together with the
+integration.
+
+![Time Of Use card](https://raw.githubusercontent.com/maxbanton/hass-deye-local/main/docs/tou-card.png)
+
+Add it from the dashboard editor (**Add card**, then search for **Deye Local Time
+Of Use**), or in YAML:
+
+```yaml
+type: custom:deye-local-tou-card
+```
+
+`device` picks the inverter when you have more than one, and `title` replaces the
+heading. Both can be set in the card editor.
+
+- Changes are collected until you press **Save**, then written with
+  `deye_local.set_tou_schedule`. Only the fields you changed are sent, so a
+  change made on the inverter's screen in the meantime is kept. **Discard**
+  drops them.
+- Each slot ends where the next one starts, so changing a slot's end time moves
+  the next slot's start, as on the inverter. Start times have to stay in order.
+- The slot that applies right now is highlighted. Times follow the time format
+  in your Home Assistant profile.
+- The preview in the card editor is read only, so configuring the card never
+  changes the inverter.
+
+The Deye Cloud integration has its own card, **Deye Cloud Time Of Use**, and both
+can be used side by side for different inverters.
+
+Example: charge from the grid to 100 % overnight and hold 60 % from 05:00.
+
+```yaml
+action: deye_local.set_tou_schedule
+data:
+  slots:
+    - time: "01:00"
+      batt: 100
+      grid_charge: true
+    - time: "05:00"
+      batt: 60
+    - {}
+    - {}
+    - {}
+    - {}
+```
+
 ## Battery modules
 
 When the BMS reports per-module data, each module gets its own device

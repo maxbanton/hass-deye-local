@@ -1,0 +1,14 @@
+set_tou_schedule:
+  fields:
+    device_id:
+      required: false
+      selector:
+        device:
+          integration: deye_local
+    slots:
+      required: true
+      example: >-
+        [{"time": "01:00", "batt": 100}, {"time": "05:00", "batt": 60}, {}, {},
+        {"time": "17:00", "grid_charge": false}, {"time": "21:00", "batt": 100}]
+      selector:
+        object:

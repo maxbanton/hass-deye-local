@@ -1,6 +1,8 @@
 """The Deye Local integration: Deye inverters over the WiBLE logger's Bluetooth link."""
 from __future__ import annotations
 
+from pathlib import Path
+
 from homeassistant.components import bluetooth
 from homeassistant.components.bluetooth import (
     BluetoothCallbackMatcher,
@@ -8,12 +10,17 @@ from homeassistant.components.bluetooth import (
     BluetoothScanningMode,
     BluetoothServiceInfoBleak,
 )
+from homeassistant.components.frontend import add_extra_js_url
+from homeassistant.components.http import StaticPathConfig
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_ADDRESS, Platform
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import ConfigEntryNotReady
+from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import issue_registry as ir
+from homeassistant.helpers.typing import ConfigType
+from homeassistant.loader import async_get_integration
 
 from .const import (
     CONF_DEVICE_TYPE,
@@ -26,6 +33,7 @@ from .const import (
 from .coordinator import DeyeLocalCoordinator
 from .entity import async_register_device, inverter_device_info, inverter_identifier
 from .models import Support, family_for
+from .services import async_setup_services
 
 PLATFORMS = [
     Platform.NUMBER,
@@ -36,7 +44,35 @@ PLATFORMS = [
 ]
 ISSUES_URL = "https://github.com/maxbanton/hass-deye-local/issues"
 
+CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
+
 type DeyeLocalConfigEntry = ConfigEntry[DeyeLocalCoordinator]
+
+
+FRONTEND_URL = f"/{DOMAIN}/frontend"
+FRONTEND_PATH = Path(__file__).parent / "frontend"
+CARD_FILE = "deye-local-tou-card.js"
+
+
+async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
+    async_setup_services(hass)
+    await _async_register_card(hass)
+    return True
+
+
+async def _async_register_card(hass: HomeAssistant) -> None:
+    """Serve the time of use card and load it on every dashboard.
+
+    The frontend is only an after-dependency, so setups without it (tests,
+    headless installs) still load the integration.
+    """
+    if "frontend" not in hass.config.components or hass.http is None:
+        return
+    version = (await async_get_integration(hass, DOMAIN)).version
+    await hass.http.async_register_static_paths(
+        [StaticPathConfig(FRONTEND_URL, str(FRONTEND_PATH), True)]
+    )
+    add_extra_js_url(hass, f"{FRONTEND_URL}/{CARD_FILE}?v={version}")
 
 
 def _issue_id(entry: ConfigEntry) -> str:
