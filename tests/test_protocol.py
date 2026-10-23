@@ -118,3 +118,25 @@ def test_parse_write_reports_modbus_exceptions():
 
 def test_write_complete_waits_for_the_whole_frame():
     assert not protocol.write_complete("+ok=011000D2")
+
+
+def test_reply_with_a_garbled_function_code_is_complete():
+    assert protocol.read_complete("+ok=01ZZ0000000000", 2)
+
+
+def test_parse_read_rejects_non_hex():
+    with pytest.raises(ProtocolError, match="not hex"):
+        protocol.parse_read("+ok=ZZZZZZZZZZZZZZ", 1)
+
+
+def test_parse_read_rejects_a_short_reply():
+    with pytest.raises(ProtocolError, match="short"):
+        protocol.parse_read("+ok=010302", 1)
+
+
+def test_parse_read_rejects_another_slave():
+    body = bytes([2, 3, 2, 0, 1])
+    crc = protocol.crc16(body)
+    reply = "+ok=" + (body + bytes([crc & 0xFF, crc >> 8])).hex()
+    with pytest.raises(ProtocolError, match="header"):
+        protocol.parse_read(reply, 1)

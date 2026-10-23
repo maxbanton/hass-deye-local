@@ -4,6 +4,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
+from collections.abc import Callable
 from datetime import timedelta
 from typing import Any
 
@@ -72,6 +73,8 @@ class DeyeLocalCoordinator(DataUpdateCoordinator[dict[int, int]]):
         self._scan_batteries = family.has_battery_modules
         self._last_battery_scan: float | None = None
         self._registers: dict[int, int] = {}
+        # Set once the logger has not answered a multi-column write.
+        self._split_writes = False
         self._last_success = 0.0
         self.last_error: str | None = None
         # One poll or diagnostics sweep at a time over the single session.
@@ -215,6 +218,91 @@ class DeyeLocalCoordinator(DataUpdateCoordinator[dict[int, int]]):
                 translation_key="write_not_applied",
                 translation_placeholders={"name": control.name},
             )
+
+    async def async_write_registers(
+        self,
+        name: str,
+        span: range,
+        columns: list[range],
+        build: Callable[[dict[int, int]], dict[int, int]],
+    ) -> None:
+        """Write a group of settings at once and confirm the inverter kept them.
+
+        ``build`` gets ``span`` as the inverter holds it now and returns the target
+        values, so bits and fields it does not set are preserved.
+        """
+        async with self._session_lock:
+            try:
+                await self.transport.async_connect()
+                current = await self._async_read(plan_blocks(list(span), MAX_BLOCK))
+                targets = build(current)
+                changed = sorted(r for r, value in targets.items() if current[r] != value)
+                if changed:
+                    _LOGGER.debug(
+                        "Writing %s: %s", name,
+                        {f"{r:#06x}": (current[r], targets[r]) for r in changed},
+                    )
+                    await self._async_write_frames(changed, targets, current, columns)
+                    current = await self._async_read_back_span(span, targets)
+            except TransportError as err:
+                await self.transport.async_disconnect()
+                raise HomeAssistantError(
+                    translation_domain=DOMAIN,
+                    translation_key="write_failed",
+                    translation_placeholders={"name": name, "error": str(err)},
+                ) from err
+            finally:
+                if not self.keep_connected:
+                    await self.transport.async_disconnect()
+        self._settings.update(current)
+        if self.data is not None:
+            self.async_set_updated_data({**self.data, **current})
+        if any(current.get(r) != value for r, value in targets.items()):
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="write_not_applied",
+                translation_placeholders={"name": name},
+            )
+
+    async def _async_write_frames(
+        self,
+        changed: list[int],
+        targets: dict[int, int],
+        current: dict[int, int],
+        columns: list[range],
+    ) -> None:
+        def values(first: int, last: int) -> list[int]:
+            return [targets.get(r, current[r]) for r in range(first, last + 1)]
+
+        if not self._split_writes:
+            try:
+                await self.transport.async_write(changed[0], values(changed[0], changed[-1]))
+                return
+            except RegisterUnavailable:
+                raise
+            except TransportError as err:
+                # Writes set absolute values, so repeating part of a frame the
+                # logger may have taken after all is harmless.
+                _LOGGER.debug(
+                    "No reply to a %d register write (%s), writing column by column",
+                    changed[-1] - changed[0] + 1, err,
+                )
+                self._split_writes = True
+                await self.transport.async_connect()
+        for column in columns:
+            inside = [r for r in changed if r in column]
+            if inside:
+                await self.transport.async_write(inside[0], values(inside[0], inside[-1]))
+
+    async def _async_read_back_span(self, span: range, targets: dict[int, int]) -> dict[int, int]:
+        blocks = plan_blocks(list(span), MAX_BLOCK)
+        deadline = time.monotonic() + WRITE_VERIFY_TIMEOUT
+        while True:
+            values = await self._async_read(blocks)
+            kept = all(values.get(r) == value for r, value in targets.items())
+            if kept or time.monotonic() >= deadline:
+                return values
+            await asyncio.sleep(WRITE_VERIFY_DELAY)
 
     async def _async_read_back(self, register: int, target: int) -> int:
         deadline = time.monotonic() + WRITE_VERIFY_TIMEOUT

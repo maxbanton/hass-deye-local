@@ -12,9 +12,12 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_ADDRESS, Platform
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import ConfigEntryNotReady
+from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import issue_registry as ir
+from homeassistant.helpers.typing import ConfigType
 
+from .card import async_add_card_resource, async_remove_card_resource, async_serve_card
 from .const import (
     CONF_DEVICE_TYPE,
     CONF_KEEP_CONNECTED,
@@ -26,6 +29,7 @@ from .const import (
 from .coordinator import DeyeLocalCoordinator
 from .entity import async_register_device, inverter_device_info, inverter_identifier
 from .models import Support, family_for
+from .services import async_setup_services
 
 PLATFORMS = [
     Platform.NUMBER,
@@ -36,7 +40,15 @@ PLATFORMS = [
 ]
 ISSUES_URL = "https://github.com/maxbanton/hass-deye-local/issues"
 
+CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
+
 type DeyeLocalConfigEntry = ConfigEntry[DeyeLocalCoordinator]
+
+
+async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
+    async_setup_services(hass)
+    await async_serve_card(hass)
+    return True
 
 
 def _issue_id(entry: ConfigEntry) -> str:
@@ -44,6 +56,7 @@ def _issue_id(entry: ConfigEntry) -> str:
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: DeyeLocalConfigEntry) -> bool:
+    await async_add_card_resource(hass)
     address = entry.data[CONF_ADDRESS]
     device = bluetooth.async_ble_device_from_address(hass, address, connectable=True)
     if device is None:
@@ -146,3 +159,7 @@ async def async_remove_config_entry_device(
 
 async def async_remove_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
     ir.async_delete_issue(hass, DOMAIN, _issue_id(entry))
+    if not any(
+        other.entry_id != entry.entry_id for other in hass.config_entries.async_entries(DOMAIN)
+    ):
+        await async_remove_card_resource(hass)

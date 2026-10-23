@@ -260,3 +260,76 @@ async def test_write_sends_write_multiple_and_checks_the_echo(logger, transport)
     command = logger.written[-1][1].decode()
     assert command.startswith("AT+INVDATA=11,011000D2000102")
     assert await transport.async_read(0x00D2, 1) == [50]
+
+
+async def test_failed_connection_is_reported(transport) -> None:
+    async def refuse(*args, **kwargs):
+        raise OSError("adapter busy")
+
+    with (
+        patch("custom_components.deye_local.transport.establish_connection", refuse),
+        pytest.raises(TransportError, match="could not open"),
+    ):
+        await transport.async_connect()
+
+
+async def test_garbled_reply_is_a_transport_error(logger, transport) -> None:
+    await transport.async_connect()
+    with (
+        patch(
+            "custom_components.deye_local.transport.protocol.parse_read",
+            side_effect=protocol.ProtocolError("reply failed its CRC check"),
+        ),
+        pytest.raises(TransportError, match="CRC"),
+    ):
+        await transport.async_read(0, 1)
+
+
+async def test_write_needs_a_session(transport) -> None:
+    with pytest.raises(TransportError, match="not connected"):
+        await transport.async_write(0x00D2, [50])
+
+
+async def test_write_with_a_bad_echo_fails(logger, transport) -> None:
+    await transport.async_connect()
+    with (
+        patch(
+            "custom_components.deye_local.transport.protocol.parse_write",
+            side_effect=protocol.ProtocolError("echo mismatch"),
+        ),
+        pytest.raises(TransportError, match="echo mismatch"),
+    ):
+        await transport.async_write(0x00D2, [50])
+
+
+async def test_failed_disconnect_is_not_raised(logger, transport) -> None:
+    await transport.async_connect()
+
+    async def broken() -> None:
+        raise OSError("already gone")
+
+    logger.disconnect = broken
+    await transport.async_disconnect()
+    assert not transport.connected
+
+
+async def test_command_after_the_session_dropped_fails(transport) -> None:
+    with pytest.raises(TransportError, match="not connected"):
+        await transport._command(protocol.HANDSHAKE, protocol.handshake_complete)
+
+
+async def test_gatt_failure_is_a_transport_error(logger, transport) -> None:
+    await transport.async_connect()
+
+    async def broken(*args, **kwargs) -> None:
+        raise OSError("ATT error")
+
+    logger.write_gatt_char = broken
+    with pytest.raises(TransportError, match="OSError: ATT error"):
+        await transport.async_read(0, 1)
+
+
+def test_fresher_device_is_used(transport) -> None:
+    info = service_info()
+    transport.set_device(info.device)
+    assert transport._device is info.device

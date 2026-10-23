@@ -43,19 +43,45 @@
     }
   },
   "entity": {
-    "sensor": {
-      "device_state": {
-        "name": "Device state",
-        "state": {
-          "standby": "Standby",
-          "self_test": "Self test",
-          "normal": "Normal",
-          "alarm": "Alarm",
-          "fault": "Fault"
-        }
+    "number": {
+      "grid_charge_current": {
+        "name": "Grid charge current"
       },
-      "signal_strength": {
-        "name": "Signal strength"
+      "grid_charge_start_soc": {
+        "name": "Grid charge start SOC"
+      },
+      "grid_peak_shaving_power": {
+        "name": "Grid peak shaving power"
+      },
+      "low_soc": {
+        "name": "Battery low SOC"
+      },
+      "max_charge_current": {
+        "name": "Battery max charge current"
+      },
+      "max_discharge_current": {
+        "name": "Battery max discharge current"
+      },
+      "max_sell_power": {
+        "name": "Max sell power"
+      },
+      "restart_soc": {
+        "name": "Battery restart SOC"
+      },
+      "shutdown_soc": {
+        "name": "Battery shutdown SOC"
+      },
+      "tou_power": {
+        "name": "TOU slot {slot} power"
+      },
+      "tou_soc": {
+        "name": "TOU slot {slot} SOC"
+      },
+      "tou_voltage": {
+        "name": "TOU slot {slot} voltage"
+      },
+      "zero_export_power": {
+        "name": "Zero export power"
       }
     },
     "select": {
@@ -74,6 +100,265 @@
           "zero_export_to_ct": "Zero export to CT"
         }
       }
+    },
+    "sensor": {
+      "ac_temperature": {
+        "name": "AC temperature"
+      },
+      "alarm": {
+        "name": "Alarm"
+      },
+      "battery_current": {
+        "name": "Battery current"
+      },
+      "battery_power": {
+        "name": "Battery power"
+      },
+      "battery_soc": {
+        "name": "Battery SOC"
+      },
+      "battery_temperature": {
+        "name": "Battery temperature"
+      },
+      "battery_voltage": {
+        "name": "Battery voltage"
+      },
+      "bms_charge_current_limit": {
+        "name": "BMS charge current limit"
+      },
+      "bms_charge_voltage": {
+        "name": "BMS charge voltage"
+      },
+      "bms_current": {
+        "name": "BMS current"
+      },
+      "bms_discharge_current_limit": {
+        "name": "BMS discharge current limit"
+      },
+      "bms_discharge_voltage": {
+        "name": "BMS discharge voltage"
+      },
+      "bms_max_charge_current": {
+        "name": "BMS max charge current"
+      },
+      "bms_max_discharge_current": {
+        "name": "BMS max discharge current"
+      },
+      "bms_soc": {
+        "name": "BMS SOC"
+      },
+      "bms_voltage": {
+        "name": "BMS voltage"
+      },
+      "capacity": {
+        "name": "Capacity"
+      },
+      "cell_voltage_difference": {
+        "name": "Cell voltage difference"
+      },
+      "current": {
+        "name": "Current"
+      },
+      "cycles": {
+        "name": "Cycles"
+      },
+      "dc_temperature": {
+        "name": "DC temperature"
+      },
+      "device_state": {
+        "name": "Device state",
+        "state": {
+          "standby": "Standby",
+          "self_test": "Self test",
+          "normal": "Normal",
+          "alarm": "Alarm",
+          "fault": "Fault"
+        }
+      },
+      "device_type": {
+        "name": "Device type"
+      },
+      "external_ct_power": {
+        "name": "External CT power"
+      },
+      "fault": {
+        "name": "Fault"
+      },
+      "generator_power": {
+        "name": "Generator power"
+      },
+      "grid_current": {
+        "name": "Grid current"
+      },
+      "grid_frequency": {
+        "name": "Grid frequency"
+      },
+      "grid_l1_power": {
+        "name": "Grid L1 power"
+      },
+      "grid_l1_voltage": {
+        "name": "Grid L1 voltage"
+      },
+      "grid_l2_power": {
+        "name": "Grid L2 power"
+      },
+      "grid_l2_voltage": {
+        "name": "Grid L2 voltage"
+      },
+      "grid_l3_power": {
+        "name": "Grid L3 power"
+      },
+      "grid_l3_voltage": {
+        "name": "Grid L3 voltage"
+      },
+      "grid_power": {
+        "name": "Grid power"
+      },
+      "grid_voltage": {
+        "name": "Grid voltage"
+      },
+      "inverter_clock": {
+        "name": "Inverter clock"
+      },
+      "inverter_power": {
+        "name": "Inverter power"
+      },
+      "load_frequency": {
+        "name": "Load frequency"
+      },
+      "load_power": {
+        "name": "Load power"
+      },
+      "load_voltage": {
+        "name": "Load voltage"
+      },
+      "max_cell_temperature": {
+        "name": "Max cell temperature"
+      },
+      "max_cell_voltage": {
+        "name": "Max cell voltage"
+      },
+      "min_cell_temperature": {
+        "name": "Min cell temperature"
+      },
+      "min_cell_voltage": {
+        "name": "Min cell voltage"
+      },
+      "mos_temperature": {
+        "name": "MOS temperature"
+      },
+      "output_frequency": {
+        "name": "Output frequency"
+      },
+      "output_voltage": {
+        "name": "Output voltage"
+      },
+      "protocol_version": {
+        "name": "Protocol version"
+      },
+      "pv1_current": {
+        "name": "PV1 current"
+      },
+      "pv1_power": {
+        "name": "PV1 power"
+      },
+      "pv1_voltage": {
+        "name": "PV1 voltage"
+      },
+      "pv2_current": {
+        "name": "PV2 current"
+      },
+      "pv2_power": {
+        "name": "PV2 power"
+      },
+      "pv2_voltage": {
+        "name": "PV2 voltage"
+      },
+      "pv3_power": {
+        "name": "PV3 power"
+      },
+      "pv4_power": {
+        "name": "PV4 power"
+      },
+      "signal_strength": {
+        "name": "Signal strength"
+      },
+      "soc": {
+        "name": "SOC"
+      },
+      "soh": {
+        "name": "State of health"
+      },
+      "temperature": {
+        "name": "Temperature"
+      },
+      "today_battery_charge": {
+        "name": "Today battery charge"
+      },
+      "today_battery_discharge": {
+        "name": "Today battery discharge"
+      },
+      "today_grid_export": {
+        "name": "Today grid export"
+      },
+      "today_grid_import": {
+        "name": "Today grid import"
+      },
+      "today_load": {
+        "name": "Today load consumption"
+      },
+      "today_production": {
+        "name": "Today PV production"
+      },
+      "total_battery_charge": {
+        "name": "Total battery charge"
+      },
+      "total_battery_discharge": {
+        "name": "Total battery discharge"
+      },
+      "total_grid_export": {
+        "name": "Total grid export"
+      },
+      "total_grid_import": {
+        "name": "Total grid import"
+      },
+      "total_load": {
+        "name": "Total load consumption"
+      },
+      "total_production": {
+        "name": "Total PV production"
+      },
+      "ups_power": {
+        "name": "UPS power"
+      },
+      "voltage": {
+        "name": "Voltage"
+      }
+    },
+    "switch": {
+      "generator_charge": {
+        "name": "Generator charge"
+      },
+      "grid_charge": {
+        "name": "Grid charge"
+      },
+      "grid_peak_shaving": {
+        "name": "Grid peak shaving"
+      },
+      "time_of_use": {
+        "name": "Time of use"
+      },
+      "tou_generator_charge": {
+        "name": "TOU slot {slot} generator charge"
+      },
+      "tou_grid_charge": {
+        "name": "TOU slot {slot} grid charge"
+      }
+    },
+    "time": {
+      "tou_time": {
+        "name": "TOU slot {slot} time"
+      }
     }
   },
   "exceptions": {
@@ -91,6 +376,18 @@
     },
     "tou_order": {
       "message": "{name} has to be later than the previous slot's start and earlier than the next one's."
+    },
+    "unknown_device": {
+      "message": "Device {device_id} does not belong to a loaded Deye Local entry."
+    },
+    "device_required": {
+      "message": "More than one Deye Local inverter is set up. Pick the device to change."
+    },
+    "tou_not_supported": {
+      "message": "Time of use settings are not supported on the {model} yet."
+    },
+    "tou_schedule_order": {
+      "message": "Slot start times have to increase from slot 1 to slot 6."
     }
   },
   "issues": {
@@ -101,6 +398,22 @@
     "unsupported": {
       "title": "{model} is not supported yet",
       "description": "Deye Local does not have a register map for this inverter yet, so only its identity is shown. Download the diagnostics from the device page (they include a register dump) and open an issue at {url} to help add it."
+    }
+  },
+  "services": {
+    "set_tou_schedule": {
+      "name": "Set time of use schedule",
+      "description": "Write the time of use table (the inverter's Work Mode / Time Of Use screen) in one go. Only registers that change are written, then read back to confirm.",
+      "fields": {
+        "device_id": {
+          "name": "Inverter",
+          "description": "The inverter to change. Can be left out when only one is set up."
+        },
+        "slots": {
+          "name": "Slots",
+          "description": "Exactly 6 slots, in order. Each slot can set time (HH:MM, start of the slot), power (W), batt (target SOC, %), grid_charge (true/false), gen (true/false) and voltage (V). Fields left out, or an empty slot {}, keep what the inverter holds."
+        }
+      }
     }
   }
 }

@@ -1,6 +1,7 @@
 {
   "domain": "deye_local",
   "name": "Deye Local",
+  "after_dependencies": ["frontend", "http", "lovelace"],
   "bluetooth": [{ "service_uuid": "00000922-0000-1000-8000-00805f9b34fb" }],
   "codeowners": ["@maxbanton"],
   "config_flow": true,

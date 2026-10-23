@@ -204,3 +204,37 @@ async def test_grid_peak_shaving_uses_bit_8_only(hass: HomeAssistant) -> None:
     assert fake.writes == [(0x0118, [0x6110])]
     await entry.runtime_data.async_write_control(control("grid_peak_shaving"), 0)
     assert fake.writes[-1] == (0x0118, [0x6010])
+
+
+async def test_switch_off_clears_only_its_bit(hass: HomeAssistant) -> None:
+    await _setup(hass)
+    await _call(hass, "switch", "turn_off", TIME_OF_USE)
+    assert transport().writes == [(0x00F8, [254])]
+    assert hass.states.get(TIME_OF_USE).state == "off"
+
+
+async def test_setting_missing_from_the_inverter_is_unavailable(hass: HomeAssistant) -> None:
+    entry = await _setup(hass)
+    coordinator = entry.runtime_data
+    transport().registers.pop(0x00D2)
+    coordinator._settings.pop(0x00D2)
+    coordinator.async_set_updated_data({k: v for k, v in coordinator.data.items() if k != 0x00D2})
+    await hass.async_block_till_done()
+    assert hass.states.get(MAX_CHARGE).state == "unavailable"
+    assert hass.data["entity_components"]["number"].get_entity(MAX_CHARGE).native_value is None
+
+
+async def test_value_beyond_a_register_is_refused(hass: HomeAssistant) -> None:
+    await _setup(hass)
+    entity = hass.data["entity_components"]["number"].get_entity(MAX_CHARGE)
+    with pytest.raises(ServiceValidationError):
+        await entity.async_set_native_value(70000)
+    assert transport().writes == []
+
+
+async def test_switch_on_sets_only_its_bit(hass: HomeAssistant) -> None:
+    await _setup(hass)
+    await _call(hass, "switch", "turn_off", TIME_OF_USE)
+    await _call(hass, "switch", "turn_on", TIME_OF_USE)
+    assert transport().writes == [(0x00F8, [254]), (0x00F8, [255])]
+    assert hass.states.get(TIME_OF_USE).state == "on"

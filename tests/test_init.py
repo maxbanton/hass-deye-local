@@ -376,3 +376,61 @@ async def test_unload_closes_the_transport(hass: HomeAssistant) -> None:
     fake = transport()
     assert await hass.config_entries.async_unload(entry.entry_id)
     assert fake.closed
+
+
+async def test_failed_first_poll_releases_the_logger(hass: HomeAssistant) -> None:
+    class Unreachable(FakeTransport):
+        def __init__(self, device, registers=None) -> None:
+            super().__init__(device, registers)
+            self.fail = True
+
+    with patch("custom_components.deye_local.coordinator.DeyeTransport", Unreachable):
+        entry = await _setup(hass)
+    assert entry.state is ConfigEntryState.SETUP_RETRY
+    assert transport().closed
+
+
+async def test_advertisements_update_the_route(hass: HomeAssistant) -> None:
+    from homeassistant.components import bluetooth
+    from homeassistant.components.bluetooth import BluetoothChange
+
+    callbacks = []
+    register = bluetooth.async_register_callback
+
+    def capture(hass_, callback, matcher, mode):
+        callbacks.append(callback)
+        return register(hass_, callback, matcher, mode)
+
+    with patch("custom_components.deye_local.bluetooth.async_register_callback", capture):
+        entry = await _setup(hass)
+    info = service_info()
+    callbacks[0](info, BluetoothChange.ADVERTISEMENT)
+    assert transport().device is info.device
+    assert entry.runtime_data.rssi == -60
+
+
+async def test_entry_from_a_newer_version_is_not_loaded(hass: HomeAssistant) -> None:
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        unique_id=ADDRESS,
+        data={CONF_ADDRESS: ADDRESS, CONF_DEVICE_TYPE: 3, CONF_SERIAL: "2603125693"},
+        version=2,
+    )
+    entry.add_to_hass(hass)
+    await hass.config_entries.async_setup(entry.entry_id)
+    assert entry.state is ConfigEntryState.MIGRATION_ERROR
+
+
+async def test_changed_options_apply_at_once(hass: HomeAssistant) -> None:
+    entry = await _setup(hass)
+    hass.config_entries.async_update_entry(entry, options={CONF_SCAN_INTERVAL: 60})
+    await hass.async_block_till_done()
+    assert entry.runtime_data.update_interval.total_seconds() == 60
+
+
+async def test_removing_the_entry_clears_its_issue(hass: HomeAssistant) -> None:
+    entry = await _setup(hass, device_type=5)
+    issues = ir.async_get(hass)
+    assert issues.async_get_issue(DOMAIN, f"model_{entry.entry_id}") is not None
+    await hass.config_entries.async_remove(entry.entry_id)
+    assert issues.async_get_issue(DOMAIN, f"model_{entry.entry_id}") is None

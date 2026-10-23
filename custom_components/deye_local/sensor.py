@@ -83,12 +83,10 @@ class _RegisterValue:
         self._attr_entity_registry_enabled_default = sensor.enabled
         if sensor.diagnostic:
             self._attr_entity_category = EntityCategory.DIAGNOSTIC
+        self._attr_translation_key = sensor.key
         if sensor.kind is Kind.STATE:
-            self._attr_translation_key = sensor.key
             self._attr_device_class = SensorDeviceClass.ENUM
             self._attr_options = DEVICE_STATES
-        else:
-            self._attr_name = sensor.name
 
     @property
     def native_value(self) -> Any:

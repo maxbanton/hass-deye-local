@@ -65,6 +65,8 @@ class FakeTransport:
         self.writes: list[tuple[int, list[int]]] = []
         # Registers the inverter acknowledges but does not change.
         self.ignored_writes: set[int] = set()
+        # Longest write the logger answers; longer frames time out.
+        self.max_write: int | None = None
         self.logger_type = "21511,21511"
         FakeTransport.instances.append(self)
 
@@ -93,6 +95,8 @@ class FakeTransport:
     async def async_write(self, start: int, values: list[int]) -> None:
         if self.fail:
             raise TransportError("logger not answering")
+        if self.max_write is not None and len(values) > self.max_write:
+            raise TransportError("no complete reply to AT+INVDATA=")
         self.writes.append((start, list(values)))
         for offset, value in enumerate(values):
             if start + offset not in self.ignored_writes:

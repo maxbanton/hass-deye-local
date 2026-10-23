@@ -122,3 +122,34 @@ def test_energy_counters_feed_the_energy_dashboard(family):
     for sensor in family.sensors:
         if sensor.unit == "kWh":
             assert sensor.state_class == "total_increasing", sensor.key
+
+
+def test_codes_need_their_registers():
+    from custom_components.deye_local.models import SINGLE_PHASE, Kind, describe_codes
+
+    fault = next(s for s in SINGLE_PHASE.sensors if s.kind is Kind.FAULT)
+    assert describe_codes(fault, {}) == {}
+    plain = next(s for s in SINGLE_PHASE.sensors if s.kind not in (Kind.FAULT, Kind.ALARM))
+    assert describe_codes(plain, SNAPSHOT) == {}
+
+
+def test_alarm_codes_use_deye_numbering():
+    from custom_components.deye_local.models import SINGLE_PHASE, Kind, describe_codes
+
+    alarm = next(s for s in SINGLE_PHASE.sensors if s.kind is Kind.ALARM)
+    regs = dict.fromkeys(alarm.registers, 0)
+    regs[alarm.registers[0]] = 0b10
+    assert list(describe_codes(alarm, regs)) == ["W02"]
+
+
+def test_rated_power_needs_the_family_and_its_registers():
+    from custom_components.deye_local.models import (
+        SINGLE_PHASE,
+        THREE_PHASE,
+        control_value,
+        rated_power,
+    )
+
+    assert rated_power(THREE_PHASE, SNAPSHOT) is None
+    assert rated_power(SINGLE_PHASE, {}) is None
+    assert control_value(SINGLE_PHASE.controls[0], {}) is None

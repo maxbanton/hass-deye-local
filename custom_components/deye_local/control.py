@@ -1,6 +1,8 @@
 """Base for entities that change inverter settings."""
 from __future__ import annotations
 
+import re
+
 from homeassistant.const import EntityCategory
 
 from .coordinator import DeyeLocalCoordinator
@@ -19,10 +21,12 @@ class DeyeControlEntity(DeyeLocalEntity):
         super().__init__(coordinator, control.key)
         self.control = control
         self._attr_entity_registry_enabled_default = control.enabled
-        if control.options:
+        if control.tou_slot is None:
             self._attr_translation_key = control.key
         else:
-            self._attr_name = control.name
+            # One translation per column of the time of use table.
+            self._attr_translation_key = re.sub(r"^tou\d_", "tou_", control.key)
+            self._attr_translation_placeholders = {"slot": str(control.tou_slot + 1)}
         if control.config:
             self._attr_entity_category = EntityCategory.CONFIG
 

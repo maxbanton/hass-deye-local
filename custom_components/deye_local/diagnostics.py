@@ -16,7 +16,6 @@ from homeassistant.core import HomeAssistant
 from . import DeyeLocalConfigEntry
 from .const import CONF_SERIAL
 from .models import MAX_BATTERIES, REG_SERIAL, battery_serial_block
-from .transport import TransportError
 
 TO_REDACT = {CONF_ADDRESS, CONF_SERIAL}
 _MAC = re.compile(r"([0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}")
@@ -51,10 +50,7 @@ async def async_get_config_entry_diagnostics(
     info = bluetooth.async_last_service_info(hass, coordinator.address, connectable=True)
     hidden = _serial_registers()
 
-    try:
-        dump = await coordinator.async_dump()
-    except TransportError as err:
-        dump = {"error": str(err)}
+    dump = await coordinator.async_dump()
 
     return {
         "entry": {
