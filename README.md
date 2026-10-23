@@ -291,10 +291,11 @@ type: custom:deye-local-tou-card
 `device` picks the inverter when you have more than one, and `title` replaces the
 heading. Both can be set in the card editor.
 
-The card is loaded when Home Assistant's page loads. After installing or
-updating the integration, reload the page in the browser; in the Home Assistant
-app, close the app completely and open it again (pulling to refresh is not
-enough). Until then the card shows a configuration error.
+The integration adds the card to your dashboard resources (**Settings >
+Dashboards > ⋮ > Resources**), keeps it on the installed version and removes it
+with the last config entry. If your resources are managed in YAML, it loads the
+card with Home Assistant's page instead: after installing or updating, reload
+the page, or close the Home Assistant app completely and open it again.
 
 - Changes are collected until you press **Save**, then written with
   `deye_local.set_tou_schedule`. Only the fields you changed are sent, so a

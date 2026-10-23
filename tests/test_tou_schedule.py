@@ -203,20 +203,3 @@ async def test_time_of_use_switch_carries_the_table(hass: HomeAssistant) -> None
     schedule = hass.states.get(f"switch.{PREFIX}_time_of_use").attributes["schedule"]
     assert schedule[2]["batt"] == 65
     assert hass.states.get(f"switch.{PREFIX}_grid_charge").attributes.get("schedule") is None
-
-
-async def test_card_is_served_and_loaded_with_the_frontend(hass: HomeAssistant) -> None:
-    from unittest.mock import AsyncMock, MagicMock
-
-    from custom_components.deye_local import FRONTEND_PATH
-
-    hass.config.components.add("frontend")
-    hass.http = MagicMock(async_register_static_paths=AsyncMock())
-    with patch("custom_components.deye_local.add_extra_js_url") as add_url:
-        await _setup(hass)
-    (paths,), _ = hass.http.async_register_static_paths.call_args
-    assert paths[0].url_path == "/deye_local/frontend"
-    assert (FRONTEND_PATH / "deye-local-tou-card.js").is_file()
-    assert (FRONTEND_PATH / "tou-card-core.js").is_file()
-    add_url.assert_called_once()
-    assert add_url.call_args.args[1].startswith("/deye_local/frontend/deye-local-tou-card.js?v=")

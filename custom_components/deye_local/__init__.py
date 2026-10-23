@@ -1,8 +1,6 @@
 """The Deye Local integration: Deye inverters over the WiBLE logger's Bluetooth link."""
 from __future__ import annotations
 
-from pathlib import Path
-
 from homeassistant.components import bluetooth
 from homeassistant.components.bluetooth import (
     BluetoothCallbackMatcher,
@@ -10,8 +8,6 @@ from homeassistant.components.bluetooth import (
     BluetoothScanningMode,
     BluetoothServiceInfoBleak,
 )
-from homeassistant.components.frontend import add_extra_js_url
-from homeassistant.components.http import StaticPathConfig
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_ADDRESS, Platform
 from homeassistant.core import HomeAssistant, callback
@@ -20,8 +16,8 @@ from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import issue_registry as ir
 from homeassistant.helpers.typing import ConfigType
-from homeassistant.loader import async_get_integration
 
+from .card import async_add_card_resource, async_remove_card_resource, async_serve_card
 from .const import (
     CONF_DEVICE_TYPE,
     CONF_KEEP_CONNECTED,
@@ -49,30 +45,10 @@ CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 type DeyeLocalConfigEntry = ConfigEntry[DeyeLocalCoordinator]
 
 
-FRONTEND_URL = f"/{DOMAIN}/frontend"
-FRONTEND_PATH = Path(__file__).parent / "frontend"
-CARD_FILE = "deye-local-tou-card.js"
-
-
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     async_setup_services(hass)
-    await _async_register_card(hass)
+    await async_serve_card(hass)
     return True
-
-
-async def _async_register_card(hass: HomeAssistant) -> None:
-    """Serve the time of use card and load it on every dashboard.
-
-    The frontend is only an after-dependency, so setups without it (tests,
-    headless installs) still load the integration.
-    """
-    if "frontend" not in hass.config.components or hass.http is None:
-        return
-    version = (await async_get_integration(hass, DOMAIN)).version
-    await hass.http.async_register_static_paths(
-        [StaticPathConfig(FRONTEND_URL, str(FRONTEND_PATH), True)]
-    )
-    add_extra_js_url(hass, f"{FRONTEND_URL}/{CARD_FILE}?v={version}")
 
 
 def _issue_id(entry: ConfigEntry) -> str:
@@ -80,6 +56,7 @@ def _issue_id(entry: ConfigEntry) -> str:
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: DeyeLocalConfigEntry) -> bool:
+    await async_add_card_resource(hass)
     address = entry.data[CONF_ADDRESS]
     device = bluetooth.async_ble_device_from_address(hass, address, connectable=True)
     if device is None:
@@ -182,3 +159,7 @@ async def async_remove_config_entry_device(
 
 async def async_remove_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
     ir.async_delete_issue(hass, DOMAIN, _issue_id(entry))
+    if not any(
+        other.entry_id != entry.entry_id for other in hass.config_entries.async_entries(DOMAIN)
+    ):
+        await async_remove_card_resource(hass)
