@@ -38,6 +38,10 @@ class Kind(StrEnum):
     S16 = "s16"
     U32 = "u32"
     S32 = "s32"
+    # Signed 32-bit whose high word some three-phase models update apart from the
+    # low word: near 0 W the two can disagree in sign, so a high word of 0x0000 or
+    # 0xFFFF only extends the signed low word.
+    S32_LOW_SIGNED = "s32_low_signed"
     STATE = "state"
     ALARM = "alarm"
     FAULT = "fault"
@@ -158,6 +162,12 @@ def decode(sensor: RegisterSensor, regs: dict[int, int]) -> Any:
     width = 16 * len(sensor.registers)
     match sensor.kind:
         case Kind.S16 | Kind.S32:
+            if raw >= 1 << (width - 1):
+                raw -= 1 << width
+        case Kind.S32_LOW_SIGNED:
+            if raw >> 16 in (0x0000, 0xFFFF):
+                raw &= 0xFFFF
+                width = 16
             if raw >= 1 << (width - 1):
                 raw -= 1 << width
         case Kind.STATE:
@@ -485,7 +495,7 @@ SINGLE_PHASE = Family(
 THREE_PHASE = Family(
     key="three_phase_hybrid",
     name="Three phase hybrid",
-    codes=frozenset({0x0005, 0x0500, 0x0006}),
+    codes=frozenset({0x0005, 0x0500}),
     support=Support.EXPERIMENTAL,
     has_battery_modules=True,
     sensors=(
@@ -503,10 +513,13 @@ THREE_PHASE = Family(
         volts("grid_l2_voltage", "Grid L2 voltage", 0x0257),
         volts("grid_l3_voltage", "Grid L3 voltage", 0x0258),
         hertz("grid_frequency", "Grid frequency", 0x0261),
-        power("grid_power", "Grid power", 0x0271, 0x02B2, kind=Kind.S32),
-        power("grid_l1_power", "Grid L1 power", 0x026E, 0x02AF, kind=Kind.S32, enabled=False),
-        power("grid_l2_power", "Grid L2 power", 0x026F, 0x02B0, kind=Kind.S32, enabled=False),
-        power("grid_l3_power", "Grid L3 power", 0x0270, 0x02B1, kind=Kind.S32, enabled=False),
+        power("grid_power", "Grid power", 0x0271, 0x02B2, kind=Kind.S32_LOW_SIGNED),
+        power("grid_l1_power", "Grid L1 power", 0x026E, 0x02AF, kind=Kind.S32_LOW_SIGNED,
+              enabled=False),
+        power("grid_l2_power", "Grid L2 power", 0x026F, 0x02B0, kind=Kind.S32_LOW_SIGNED,
+              enabled=False),
+        power("grid_l3_power", "Grid L3 power", 0x0270, 0x02B1, kind=Kind.S32_LOW_SIGNED,
+              enabled=False),
         power("external_ct_power", "External CT power", 0x026B, 0x02C4, kind=Kind.S32,
               enabled=False),
         power("inverter_power", "Inverter power", 0x027C, 0x02B6, kind=Kind.S32),
@@ -537,7 +550,18 @@ THREE_PHASE = Family(
         energy("total_production", "Total PV production", 0x0216, 0x0217),
         *bms(0x00D2),
     ),
+    # The single phase layout, 102 registers lower.
+    controls=(
+        Control(key="time_of_use", name="Time of use", register=0x0092,
+                platform=ControlPlatform.SWITCH, mask=0x0001),
+        *tou_controls(time=0x0094, power=0x009A, voltage=0x00A0, soc=0x00A6,
+                      charge=0x00AC),
+    ),
 )
+
+# High voltage models scale the time of use power (x10) and voltage (x0.1)
+# differently, so they stay read only until one confirms the map.
+THREE_PHASE_HV = replace(THREE_PHASE, codes=frozenset({0x0006}), controls=())
 
 
 KNOWN_UNSUPPORTED = {
@@ -553,7 +577,7 @@ KNOWN_UNSUPPORTED = {
     0x0104: "Energy storage system",
 }
 
-FAMILIES = (SINGLE_PHASE, THREE_PHASE)
+FAMILIES = (SINGLE_PHASE, THREE_PHASE, THREE_PHASE_HV)
 
 
 def family_for(device_type: int) -> Family:

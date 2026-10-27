@@ -153,8 +153,16 @@ async def test_device_can_be_picked(hass: HomeAssistant) -> None:
         await _set(hass, schedule(), device_id="nope")
 
 
-async def test_family_without_tou_is_rejected(hass: HomeAssistant) -> None:
+async def test_low_voltage_three_phase_writes_its_own_registers(hass: HomeAssistant) -> None:
     await _setup(hass, device_type=5)
+    transport().registers.update({0x0094 + i: hhmm for i, hhmm in enumerate(
+        (100, 500, 900, 1300, 1700, 2100))})
+    await _set(hass, [{}, {}, {"batt": 70}, {}, {}, {}])
+    assert transport().writes == [(0x00A8, [70])]
+
+
+async def test_family_without_tou_is_rejected(hass: HomeAssistant) -> None:
+    await _setup(hass, device_type=6)
     with pytest.raises(ServiceValidationError, match="not supported"):
         await _set(hass, schedule())
 

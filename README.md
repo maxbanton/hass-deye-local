@@ -50,8 +50,9 @@ than a Bluetooth adapter or an ESPHome Bluetooth proxy in range.
 - **Settings you can change** on single phase hybrids: battery charge and
   discharge current, grid charge current, shutdown, restart and low SOC, energy
   pattern, work mode, grid charging, the six time of use slots, max sell and
-  zero export power, and grid peak shaving. Every change is read back from
-  the inverter and reported as an error if it did not stick.
+  zero export power, and grid peak shaving. Low voltage three phase hybrids get
+  the time of use switch and slots (experimental). Every change is read back
+  from the inverter and reported as an error if it did not stick.
 
 ## What you need
 
@@ -132,7 +133,8 @@ same family as the base model.
 **Experimental** means the register map follows Deye's protocol documents and
 two independent open source implementations, and user reports confirm it, but it
 has not been verified on hardware by this project yet.
-Values are read only (no settings are exposed), and a repair notice asks you to
+Low voltage models (LP3) expose only the time of use switch and slots as
+settings; high voltage models (HP3) are read only. A repair notice asks you to
 report anything that looks wrong.
 
 **Recognised, not mapped yet** means setup still succeeds and the device shows
@@ -222,6 +224,10 @@ Single phase hybrids get these controls on the inverter device:
 | TOU slot 1 to 6 time and SOC | enabled, under Configuration |
 | Max sell power, Zero export power, Grid peak shaving and its power | disabled, under Configuration |
 | TOU slot power, voltage, grid charge and generator charge; Generator charge; Grid charge start SOC | disabled, under Configuration |
+
+Low voltage three phase hybrids (LP3, experimental) get only the Time of use
+switch and the TOU slot entities, with the same defaults. Their slot power is
+not limited to a rated power yet.
 
 The two charge currents are separate settings on the inverter's screen:
 **Battery max charge current** is "Max A Charge" on the first battery setting

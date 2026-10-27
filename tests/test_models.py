@@ -80,9 +80,36 @@ def test_32_bit_values_are_low_word_first():
 
 
 def test_signed_32_bit():
+    load = next(s for s in THREE_PHASE.sensors if s.key == "load_power")
+    assert load.kind is Kind.S32
+    assert decode(load, {0x028D: 0xFFFF, 0x0293: 0xFFFF}) == -1
+
+
+@pytest.mark.parametrize(
+    "low,high,watts",
+    [
+        (0x000D, 0x0000, 13),
+        (0xFFD3, 0xFFFF, -45),
+        # The high word still holds the other sign near 0 W.
+        (0xFFD3, 0x0000, -45),
+        (0x000D, 0xFFFF, 13),
+        (0x86A0, 0x0001, 100000),
+        (0x7960, 0xFFFE, -100000),
+    ],
+)
+def test_grid_power_trusts_the_sign_of_the_low_word(low, high, watts):
     grid = next(s for s in THREE_PHASE.sensors if s.key == "grid_power")
-    assert grid.kind is Kind.S32
-    assert decode(grid, {0x0271: 0xFFFF, 0x02B2: 0xFFFF}) == -1
+    assert decode(grid, {0x0271: low, 0x02B2: high}) == watts
+
+
+def test_only_low_voltage_three_phase_has_time_of_use():
+    low_voltage, high_voltage = family_for(0x0005), family_for(0x0006)
+    assert {c.register for c in low_voltage.controls} == set(range(0x0092, 0x0093)) | set(
+        range(0x0094, 0x00B2)
+    )
+    assert high_voltage.controls == ()
+    assert high_voltage.key == low_voltage.key
+    assert high_voltage.sensors == low_voltage.sensors
 
 
 @pytest.mark.parametrize(

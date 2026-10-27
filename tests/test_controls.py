@@ -151,8 +151,19 @@ async def test_tou_power_is_bounded_by_the_rated_power(hass: HomeAssistant) -> N
     assert state.attributes["max"] == 6000
 
 
-async def test_experimental_family_has_no_controls(hass: HomeAssistant) -> None:
+async def test_low_voltage_three_phase_has_only_time_of_use(hass: HomeAssistant) -> None:
     await _setup(hass, device_type=5)
+    three = "deye_three_phase_hybrid"
+    assert hass.states.async_entity_ids("switch") == [f"switch.{three}_time_of_use"]
+    assert len(hass.states.async_entity_ids("time")) == 6
+    assert hass.states.async_entity_ids("select") == []
+    assert {e.split(f"{three}_")[1] for e in hass.states.async_entity_ids("number")} == {
+        f"tou_slot_{n}_soc" for n in range(1, 7)
+    }
+
+
+async def test_high_voltage_three_phase_has_no_controls(hass: HomeAssistant) -> None:
+    await _setup(hass, device_type=6)
     for domain in ("number", "select", "switch", "time"):
         assert hass.states.async_entity_ids(domain) == []
 
