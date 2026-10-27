@@ -113,9 +113,8 @@ def test_low_voltage_three_phase_has_the_single_phase_settings_lower():
     assert three["time_of_use"].register == 0x0092
     assert three["tou1_soc"].register == 0x00A6
     assert three["max_charge_current"].register == 0x006C
-    assert (three["grid_peak_shaving"].register, three["grid_peak_shaving"].mask) == (
-        0x00B2, 0x0010
-    )
+    shaving = three["grid_peak_shaving"]
+    assert (shaving.register, shaving.mask, shaving.write_bits) == (0x00B2, 0x0010, 0x0020)
     assert three["grid_charge_current"].maximum == 350
     assert high_voltage.controls == ()
     assert high_voltage.key == low_voltage.key
@@ -183,10 +182,13 @@ def test_rated_power_needs_the_family_and_its_registers():
     from custom_components.deye_local.models import (
         SINGLE_PHASE,
         THREE_PHASE,
+        THREE_PHASE_HV,
         control_value,
         rated_power,
     )
 
-    assert rated_power(THREE_PHASE, SNAPSHOT) is None
+    assert rated_power(THREE_PHASE_HV, SNAPSHOT) is None
+    # Read from a SUN-10K-SG05LP3-EU-SM2.
+    assert rated_power(THREE_PHASE, {0x0014: 34464, 0x0015: 1}) == 10000
     assert rated_power(SINGLE_PHASE, {}) is None
     assert control_value(SINGLE_PHASE.controls[0], {}) is None

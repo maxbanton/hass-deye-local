@@ -100,8 +100,8 @@ class Control:
     """A setting held in one holding register.
 
     ``mask`` limits a control to some bits of its register; the other bits are
-    kept as the inverter reports them at write time. Times are stored as HHMM
-    in decimal.
+    kept as the inverter reports them at write time, except ``write_bits``,
+    which every write sets. Times are stored as HHMM in decimal.
     """
 
     key: str
@@ -109,6 +109,7 @@ class Control:
     register: int
     platform: ControlPlatform
     mask: int = 0xFFFF
+    write_bits: int = 0
     scale: float = 1
     minimum: float = 0
     # None: the inverter's rated power.
@@ -348,7 +349,8 @@ def control_value(control: Control, regs: dict[int, int]) -> int | None:
 
 def with_control_value(control: Control, current: int, value: int) -> int:
     shift = (control.mask & -control.mask).bit_length() - 1
-    return (current & ~control.mask & 0xFFFF) | (value << shift & control.mask)
+    value = value << shift & control.mask
+    return (current & ~control.mask & 0xFFFF) | value | control.write_bits
 
 
 def rated_power(family: Family, regs: dict[int, int]) -> float | None:
@@ -492,13 +494,14 @@ SINGLE_PHASE = Family(
 
 
 # Low voltage three phase hybrids hold the single phase settings 102 registers
-# lower, with grid peak shaving on bit 4 and battery currents up to 350 A.
+# lower, with battery currents up to 350 A. Grid peak shaving is a bit pair:
+# bit 4 holds the value and bit 5 marks it valid (10 off, 11 on).
 THREE_PHASE_OFFSET = 0x0066
 THREE_PHASE_OVERRIDES: dict[str, dict[str, Any]] = {
     "max_charge_current": {"maximum": 350},
     "max_discharge_current": {"maximum": 350},
     "grid_charge_current": {"maximum": 350},
-    "grid_peak_shaving": {"mask": 0x0010},
+    "grid_peak_shaving": {"mask": 0x0010, "write_bits": 0x0020},
 }
 
 
@@ -569,12 +572,14 @@ THREE_PHASE = Family(
         energy("total_production", "Total PV production", 0x0216, 0x0217),
         *bms(0x00D2),
     ),
+    rated_power=(0x0014, 0x0015),
     controls=three_phase_controls(),
 )
 
 # High voltage models scale the time of use power (x10) and voltage (x0.1)
 # differently, so they stay read only until one confirms the map.
-THREE_PHASE_HV = replace(THREE_PHASE, codes=frozenset({0x0006}), controls=())
+THREE_PHASE_HV = replace(THREE_PHASE, codes=frozenset({0x0006}), controls=(),
+                         rated_power=())
 
 
 KNOWN_UNSUPPORTED = {

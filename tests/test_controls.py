@@ -216,6 +216,39 @@ async def test_grid_peak_shaving_uses_bit_8_only(hass: HomeAssistant) -> None:
     assert fake.writes[-1] == (0x0118, [0x6010])
 
 
+@pytest.mark.parametrize(
+    ("current", "on", "off"),
+    [(0x0020, 0x0030, 0x0020), (0x0000, 0x0030, 0x0020), (0x0031, 0x0031, 0x0021)],
+)
+async def test_three_phase_grid_peak_shaving_marks_its_bit_valid(
+    hass: HomeAssistant, current: int, on: int, off: int
+) -> None:
+    from custom_components.deye_local.models import THREE_PHASE
+
+    entry = await _setup(hass, device_type=5)
+    fake = transport()
+    fake.registers[0x00B2] = current
+    shaving = next(c for c in THREE_PHASE.controls if c.key == "grid_peak_shaving")
+    await entry.runtime_data.async_write_control(shaving, 1)
+    assert fake.registers[0x00B2] == on
+    await entry.runtime_data.async_write_control(shaving, 0)
+    assert fake.registers[0x00B2] == off
+
+
+async def test_three_phase_power_is_bounded_by_its_rated_power(hass: HomeAssistant) -> None:
+    from homeassistant.helpers import entity_registry as er
+
+    from .snapshot import SETTINGS
+
+    with patch.dict(SETTINGS, {0x0014: 34464, 0x0015: 1}):
+        entry = await _setup(hass, device_type=5)
+        entity_id = "number.deye_three_phase_hybrid_max_sell_power"
+        er.async_get(hass).async_update_entity(entity_id, disabled_by=None)
+        await hass.config_entries.async_reload(entry.entry_id)
+        await hass.async_block_till_done()
+    assert hass.states.get(entity_id).attributes["max"] == 10000
+
+
 async def test_switch_off_clears_only_its_bit(hass: HomeAssistant) -> None:
     await _setup(hass)
     await _call(hass, "switch", "turn_off", TIME_OF_USE)
