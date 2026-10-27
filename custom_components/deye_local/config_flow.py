@@ -58,7 +58,7 @@ SUPPORT_TEXT = {
     Support.SUPPORTED: "Supported.",
     Support.EXPERIMENTAL: (
         "Experimental: the register map for this family is not yet confirmed on real "
-        "hardware. Values are read only; please report anything that looks wrong."
+        "hardware. Few or no settings are exposed; please report anything that looks wrong."
     ),
     Support.UNSUPPORTED: (
         "Not supported yet. The device is added with its identity only, so you can "
