@@ -102,11 +102,21 @@ def test_grid_power_trusts_the_sign_of_the_low_word(low, high, watts):
     assert decode(grid, {0x0271: low, 0x02B2: high}) == watts
 
 
-def test_only_low_voltage_three_phase_has_time_of_use():
+def test_low_voltage_three_phase_has_the_single_phase_settings_lower():
+    from custom_components.deye_local.models import SINGLE_PHASE
+
     low_voltage, high_voltage = family_for(0x0005), family_for(0x0006)
-    assert {c.register for c in low_voltage.controls} == set(range(0x0092, 0x0093)) | set(
-        range(0x0094, 0x00B2)
+    single = {c.key: c for c in SINGLE_PHASE.controls}
+    three = {c.key: c for c in low_voltage.controls}
+    assert three.keys() == single.keys()
+    assert all(three[k].register == single[k].register - 0x66 for k in single)
+    assert three["time_of_use"].register == 0x0092
+    assert three["tou1_soc"].register == 0x00A6
+    assert three["max_charge_current"].register == 0x006C
+    assert (three["grid_peak_shaving"].register, three["grid_peak_shaving"].mask) == (
+        0x00B2, 0x0010
     )
+    assert three["grid_charge_current"].maximum == 350
     assert high_voltage.controls == ()
     assert high_voltage.key == low_voltage.key
     assert high_voltage.sensors == low_voltage.sensors

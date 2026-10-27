@@ -491,6 +491,25 @@ SINGLE_PHASE = Family(
 )
 
 
+# Low voltage three phase hybrids hold the single phase settings 102 registers
+# lower, with grid peak shaving on bit 4 and battery currents up to 350 A.
+THREE_PHASE_OFFSET = 0x0066
+THREE_PHASE_OVERRIDES: dict[str, dict[str, Any]] = {
+    "max_charge_current": {"maximum": 350},
+    "max_discharge_current": {"maximum": 350},
+    "grid_charge_current": {"maximum": 350},
+    "grid_peak_shaving": {"mask": 0x0010},
+}
+
+
+def three_phase_controls() -> tuple[Control, ...]:
+    return tuple(
+        replace(c, register=c.register - THREE_PHASE_OFFSET,
+                **THREE_PHASE_OVERRIDES.get(c.key, {}))
+        for c in SINGLE_PHASE.controls
+    )
+
+
 # SUN-*K-SG0*LP3, SUN-*K-SG0*HP3
 THREE_PHASE = Family(
     key="three_phase_hybrid",
@@ -550,13 +569,7 @@ THREE_PHASE = Family(
         energy("total_production", "Total PV production", 0x0216, 0x0217),
         *bms(0x00D2),
     ),
-    # The single phase layout, 102 registers lower.
-    controls=(
-        Control(key="time_of_use", name="Time of use", register=0x0092,
-                platform=ControlPlatform.SWITCH, mask=0x0001),
-        *tou_controls(time=0x0094, power=0x009A, voltage=0x00A0, soc=0x00A6,
-                      charge=0x00AC),
-    ),
+    controls=three_phase_controls(),
 )
 
 # High voltage models scale the time of use power (x10) and voltage (x0.1)
