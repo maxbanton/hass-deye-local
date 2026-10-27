@@ -80,9 +80,45 @@ def test_32_bit_values_are_low_word_first():
 
 
 def test_signed_32_bit():
+    load = next(s for s in THREE_PHASE.sensors if s.key == "load_power")
+    assert load.kind is Kind.S32
+    assert decode(load, {0x028D: 0xFFFF, 0x0293: 0xFFFF}) == -1
+
+
+@pytest.mark.parametrize(
+    "low,high,watts",
+    [
+        (0x000D, 0x0000, 13),
+        (0xFFD3, 0xFFFF, -45),
+        # The high word still holds the other sign near 0 W.
+        (0xFFD3, 0x0000, -45),
+        (0x000D, 0xFFFF, 13),
+        (0x86A0, 0x0001, 100000),
+        (0x7960, 0xFFFE, -100000),
+    ],
+)
+def test_grid_power_trusts_the_sign_of_the_low_word(low, high, watts):
     grid = next(s for s in THREE_PHASE.sensors if s.key == "grid_power")
-    assert grid.kind is Kind.S32
-    assert decode(grid, {0x0271: 0xFFFF, 0x02B2: 0xFFFF}) == -1
+    assert decode(grid, {0x0271: low, 0x02B2: high}) == watts
+
+
+def test_low_voltage_three_phase_has_the_single_phase_settings_lower():
+    from custom_components.deye_local.models import SINGLE_PHASE
+
+    low_voltage, high_voltage = family_for(0x0005), family_for(0x0006)
+    single = {c.key: c for c in SINGLE_PHASE.controls}
+    three = {c.key: c for c in low_voltage.controls}
+    assert three.keys() == single.keys()
+    assert all(three[k].register == single[k].register - 0x66 for k in single)
+    assert three["time_of_use"].register == 0x0092
+    assert three["tou1_soc"].register == 0x00A6
+    assert three["max_charge_current"].register == 0x006C
+    shaving = three["grid_peak_shaving"]
+    assert (shaving.register, shaving.mask, shaving.write_bits) == (0x00B2, 0x0010, 0x0020)
+    assert three["grid_charge_current"].maximum == 350
+    assert high_voltage.controls == ()
+    assert high_voltage.key == low_voltage.key
+    assert high_voltage.sensors == low_voltage.sensors
 
 
 @pytest.mark.parametrize(
@@ -146,10 +182,13 @@ def test_rated_power_needs_the_family_and_its_registers():
     from custom_components.deye_local.models import (
         SINGLE_PHASE,
         THREE_PHASE,
+        THREE_PHASE_HV,
         control_value,
         rated_power,
     )
 
-    assert rated_power(THREE_PHASE, SNAPSHOT) is None
+    assert rated_power(THREE_PHASE_HV, SNAPSHOT) is None
+    # Read from a SUN-10K-SG05LP3-EU-SM2.
+    assert rated_power(THREE_PHASE, {0x0014: 34464, 0x0015: 1}) == 10000
     assert rated_power(SINGLE_PHASE, {}) is None
     assert control_value(SINGLE_PHASE.controls[0], {}) is None

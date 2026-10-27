@@ -50,8 +50,9 @@ than a Bluetooth adapter or an ESPHome Bluetooth proxy in range.
 - **Settings you can change** on single phase hybrids: battery charge and
   discharge current, grid charge current, shutdown, restart and low SOC, energy
   pattern, work mode, grid charging, the six time of use slots, max sell and
-  zero export power, and grid peak shaving. Every change is read back from
-  the inverter and reported as an error if it did not stick.
+  zero export power, and grid peak shaving. Low voltage three phase hybrids get
+  the same settings (experimental). Every change is read back
+  from the inverter and reported as an error if it did not stick.
 
 ## What you need
 
@@ -132,7 +133,8 @@ same family as the base model.
 **Experimental** means the register map follows Deye's protocol documents and
 two independent open source implementations, and user reports confirm it, but it
 has not been verified on hardware by this project yet.
-Values are read only (no settings are exposed), and a repair notice asks you to
+Low voltage models (LP3) get the same settings as single phase hybrids; high
+voltage models (HP3) are read only. A repair notice asks you to
 report anything that looks wrong.
 
 **Recognised, not mapped yet** means setup still succeeds and the device shows
@@ -223,6 +225,10 @@ Single phase hybrids get these controls on the inverter device:
 | Max sell power, Zero export power, Grid peak shaving and its power | disabled, under Configuration |
 | TOU slot power, voltage, grid charge and generator charge; Generator charge; Grid charge start SOC | disabled, under Configuration |
 
+Low voltage three phase hybrids (LP3, experimental) get the same controls with
+the same defaults. Their battery currents go up to 350 A, and slot and sell power
+are not limited to a rated power yet.
+
 The two charge currents are separate settings on the inverter's screen:
 **Battery max charge current** is "Max A Charge" on the first battery setting
 page and limits charging from any source; **Grid charge current** is the "A"
@@ -241,7 +247,7 @@ How changes work:
 - After writing, the value is read back until it shows up (the logger may answer
   from its cache for a few seconds). If the inverter does not keep it, the change
   fails with an error in Home Assistant instead of pretending to succeed.
-- Limits are only the obvious ones: SOC 0 to 100 %, currents up to 240 A, slot
+- Limits are only the obvious ones: SOC 0 to 100 %, currents up to 240 A (350 A on three phase), slot
   and sell power up to the rated power the inverter reports, and slot start times in
   ascending order (each slot runs until the next one starts). Everything else is
   up to the inverter, which rejects what your model or battery does not allow.

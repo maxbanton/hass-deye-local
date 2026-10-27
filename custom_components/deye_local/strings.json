@@ -393,7 +393,7 @@
   "issues": {
     "experimental": {
       "title": "{model} support is experimental",
-      "description": "The register map for this inverter family has not been confirmed on real hardware yet. Values are read only. If any look wrong, download the diagnostics from the device page (they include a register dump) and open an issue at {url}."
+      "description": "The register map for this inverter family has not been confirmed on real hardware yet. If any values or settings look wrong, download the diagnostics from the device page (they include a register dump) and open an issue at {url}."
     },
     "unsupported": {
       "title": "{model} is not supported yet",
