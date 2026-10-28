@@ -30,6 +30,9 @@ async def test_diagnostics_include_a_register_dump(hass, hass_client) -> None:
     assert diagnostics["register_dump"]["0000"][0] == 3
     assert diagnostics["logger"]["handshake"] == "21511,21511"
     assert diagnostics["logger"]["source"] == "local"
+    assert diagnostics["coarse"] == []
+    assert diagnostics["values"]["battery_soc"] == 86
+    assert diagnostics["values"]["inverter_power"] == -41
 
 
 async def test_diagnostics_redact_identifiers(hass, hass_client) -> None:

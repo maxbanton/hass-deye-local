@@ -274,11 +274,23 @@
       "pv2_voltage": {
         "name": "PV2 voltage"
       },
+      "pv3_current": {
+        "name": "PV3 current"
+      },
       "pv3_power": {
         "name": "PV3 power"
       },
+      "pv3_voltage": {
+        "name": "PV3 voltage"
+      },
+      "pv4_current": {
+        "name": "PV4 current"
+      },
       "pv4_power": {
         "name": "PV4 power"
+      },
+      "pv4_voltage": {
+        "name": "PV4 voltage"
       },
       "signal_strength": {
         "name": "Signal strength"

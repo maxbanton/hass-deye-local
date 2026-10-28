@@ -12,6 +12,9 @@ NOTIFY_CHAR = "0000fed8-0000-1000-8000-00805f9b34fb"
 
 CONF_DEVICE_TYPE = "device_type"
 CONF_SERIAL = "serial"
+# Coarse readings detected on this unit, kept so a restart shows them right
+# before the readings can tell again.
+CONF_COARSE = "coarse"
 
 # The logger answers reads from a cache the inverter refreshes every few seconds,
 # so polling faster than the minimum only adds Bluetooth traffic and database
@@ -44,6 +47,10 @@ SETTINGS_INTERVAL = 60  # seconds
 # read-back is retried until the new value shows up.
 WRITE_VERIFY_TIMEOUT = 20.0  # seconds
 WRITE_VERIFY_DELAY = 2.0  # seconds
+
+# Polls in a row that must agree before the detected units of a reading change,
+# so one snapshot taken across a load step cannot flip them.
+UNIT_CHECK_POLLS = 3
 
 # The logger does not answer large reads.
 MAX_BLOCK = 16

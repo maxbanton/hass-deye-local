@@ -14,15 +14,17 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.deye_local import async_remove_config_entry_device
 from custom_components.deye_local.const import (
+    CONF_COARSE,
     CONF_DEVICE_TYPE,
     CONF_KEEP_CONNECTED,
     CONF_SCAN_INTERVAL,
     CONF_SERIAL,
     DOMAIN,
 )
+from custom_components.deye_local.models import Coarse
 
 from .common import ADDRESS, FakeTransport, service_info
-from .snapshot import BATTERIES
+from .snapshot import BATTERIES, SNAPSHOT_10K
 
 BATTERY_1 = "25007000E4020510"
 BATTERY_2 = "25007000E1260830"
@@ -434,3 +436,59 @@ async def test_removing_the_entry_clears_its_issue(hass: HomeAssistant) -> None:
     assert issues.async_get_issue(DOMAIN, f"model_{entry.entry_id}") is not None
     await hass.config_entries.async_remove(entry.entry_id)
     assert issues.async_get_issue(DOMAIN, f"model_{entry.entry_id}") is None
+
+
+def _ten_kw(self, device, registers=None):
+    _original_init(self, device, registers)
+    self.registers.update(SNAPSHOT_10K)
+
+
+GRID = "sensor.deye_single_phase_hybrid_grid_power"
+
+
+async def test_coarse_units_are_detected_and_kept(hass: HomeAssistant) -> None:
+    with patch.object(FakeTransport, "__init__", _ten_kw):
+        entry = await _setup(hass)
+        coordinator = entry.runtime_data
+        assert hass.states.get(GRID).state == "385"
+        for _ in range(2):
+            await coordinator.async_refresh()
+        await hass.async_block_till_done()
+        assert hass.states.get(GRID).state == "3850"
+        assert entry.data[CONF_COARSE] == ["battery_current", "power"]
+        # Saving the units does not reload the entry.
+        assert entry.runtime_data is coordinator
+
+        await hass.config_entries.async_reload(entry.entry_id)
+        await hass.async_block_till_done()
+    assert hass.states.get(GRID).state == "3850"
+    assert hass.states.get("sensor.deye_single_phase_hybrid_pv3_power") is not None
+
+
+async def test_units_change_only_after_agreeing_polls(hass: HomeAssistant) -> None:
+    with patch.object(FakeTransport, "__init__", _ten_kw):
+        entry = await _setup(hass)
+    coordinator = entry.runtime_data
+    fake = transport()
+    await coordinator.async_refresh()
+    # A snapshot that reads as documented units breaks the run.
+    fake.registers.update({0x00A9: 300, 0x00AF: 1500, 0x00B2: 1800})
+    await coordinator.async_refresh()
+    fake.registers.update(SNAPSHOT_10K)
+    await coordinator.async_refresh()
+    assert coordinator.coarse == {Coarse.BATTERY_CURRENT}
+    for _ in range(2):
+        await coordinator.async_refresh()
+    assert coordinator.coarse == {Coarse.BATTERY_CURRENT, Coarse.POWER}
+
+    for _ in range(3):
+        fake.registers.update({0x00A9: 300, 0x00AF: 1500, 0x00B2: 1800})
+        await coordinator.async_refresh()
+    assert coordinator.coarse == {Coarse.BATTERY_CURRENT}
+    assert entry.data[CONF_COARSE] == ["battery_current"]
+
+
+async def test_pv3_is_left_out_on_two_string_units(hass: HomeAssistant) -> None:
+    await _setup(hass)
+    assert hass.states.get("sensor.deye_single_phase_hybrid_pv2_power") is not None
+    assert hass.states.get("sensor.deye_single_phase_hybrid_pv3_power") is None

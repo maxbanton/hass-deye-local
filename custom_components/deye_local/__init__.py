@@ -113,6 +113,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: DeyeLocalConfigEntry) ->
         )
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+    options = dict(entry.options)
+
+    async def _async_reload(hass: HomeAssistant, entry: DeyeLocalConfigEntry) -> None:
+        # Detected units are saved to the entry data, which needs no reload.
+        if entry.options != options:
+            await hass.config_entries.async_reload(entry.entry_id)
+
     entry.async_on_unload(entry.add_update_listener(_async_reload))
     return True
 
@@ -131,10 +138,6 @@ async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             del options[CONF_SCAN_INTERVAL]
         hass.config_entries.async_update_entry(entry, options=options, minor_version=2)
     return True
-
-
-async def _async_reload(hass: HomeAssistant, entry: DeyeLocalConfigEntry) -> None:
-    await hass.config_entries.async_reload(entry.entry_id)
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: DeyeLocalConfigEntry) -> bool:

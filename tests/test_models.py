@@ -8,15 +8,17 @@ from custom_components.deye_local.models import (
     FAMILIES,
     SINGLE_PHASE,
     THREE_PHASE,
+    Coarse,
     Kind,
     Support,
     decode,
     describe_codes,
     family_for,
+    has_string,
 )
 from custom_components.deye_local.protocol import plan_blocks
 
-from .snapshot import SNAPSHOT
+from .snapshot import SNAPSHOT, SNAPSHOT_10K
 
 SENSORS = {sensor.key: sensor for sensor in SINGLE_PHASE.sensors}
 
@@ -153,3 +155,55 @@ def test_rated_power_needs_the_family_and_its_registers():
     assert rated_power(THREE_PHASE, SNAPSHOT) is None
     assert rated_power(SINGLE_PHASE, {}) is None
     assert control_value(SINGLE_PHASE.controls[0], {}) is None
+
+
+def _coarse(regs):
+    return {group for group, check in SINGLE_PHASE.unit_checks if check(regs)}
+
+
+def test_coarse_unit_is_detected_and_scaled():
+    assert {group: check(SNAPSHOT_10K) for group, check in SINGLE_PHASE.unit_checks} == {
+        Coarse.POWER: True,
+        Coarse.BATTERY_CURRENT: True,
+    }
+    coarse = _coarse(SNAPSHOT_10K)
+    assert decode(SENSORS["grid_power"], SNAPSHOT_10K, coarse) == 3850
+    assert decode(SENSORS["external_ct_power"], SNAPSHOT_10K, coarse) == 3850
+    assert decode(SENSORS["load_power"], SNAPSHOT_10K, coarse) == 2210
+    assert decode(SENSORS["battery_current"], SNAPSHOT_10K, coarse) == pytest.approx(-25.8)
+    assert decode(SENSORS["inverter_power"], SNAPSHOT_10K, coarse) == -1636
+    assert decode(SENSORS["battery_power"], SNAPSHOT_10K, coarse) == -1407
+
+
+def test_documented_unit_is_detected():
+    # A SUN-6K discharging into the house: 1.8 kW load, 20.9 A out of the battery.
+    regs = {0x00A9: 300, 0x00AF: 1500, 0x00B2: 1800, 0x00B7: 5300, 0x00BE: 1110,
+            0x00BF: 2090}
+    assert [check(regs) for _, check in SINGLE_PHASE.unit_checks] == [False, False]
+
+
+@pytest.mark.parametrize(
+    "regs",
+    [
+        # Too little inverter power and battery current to tell.
+        SNAPSHOT,
+        # Readings that fit neither unit.
+        {0x00A9: 1000, 0x00AF: 1000, 0x00B2: 1000, 0x00B7: 5000, 0x00BE: 1000,
+         0x00BF: 500},
+        # Missing registers.
+        {},
+        {0x00B7: 0, 0x00BE: 1000, 0x00BF: 2000},
+    ],
+)
+def test_unit_checks_abstain(regs):
+    assert [check(regs) for _, check in SINGLE_PHASE.unit_checks] == [None, None]
+
+
+def test_pv_strings_follow_the_mppt_count():
+    pv3 = SENSORS["pv3_power"]
+    assert not has_string(SINGLE_PHASE, pv3, {0x0012: 0x0201})
+    assert not has_string(SINGLE_PHASE, pv3, {})
+    assert has_string(SINGLE_PHASE, pv3, SNAPSHOT_10K)
+    assert not has_string(SINGLE_PHASE, SENSORS["pv4_power"], SNAPSHOT_10K)
+    assert has_string(SINGLE_PHASE, SENSORS["pv1_power"], {})
+    assert decode(SENSORS["pv3_voltage"], SNAPSHOT_10K) == pytest.approx(3.8)
