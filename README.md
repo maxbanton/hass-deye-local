@@ -122,7 +122,7 @@ picks the matching register map.
 
 | Family | Models | Status |
 |--------|--------|--------|
-| Single phase hybrid | `SUN-*K-SG0*LP1`, for example SUN-3.6K-SG03LP1-EU, SUN-6K-SG05LP1-EU, SUN-8K-SG01LP1-EU | Supported, verified on a SUN-6K-SG05LP1-EU-AM2-P |
+| Single phase hybrid | `SUN-*K-SG0*LP1`, for example SUN-3.6K-SG03LP1-EU, SUN-6K-SG05LP1-EU, SUN-8K-SG01LP1-EU | Supported, verified on a SUN-6K-SG05LP1-EU-AM2-P, reported working on a SUN-10K-SG02LP1-EU-AM3 |
 | Three phase hybrid, low and high voltage | `SUN-*K-SG0*LP3` and `SUN-*K-SG0*HP3`, for example SUN-12K-SG04LP3-EU, SUN-10K-SG01HP3-EU-AM2 | Experimental, reported working on a SUN-10K-SG05LP3-EU-SM2 |
 | String, micro, high voltage three phase, off grid | | Recognised, not mapped yet |
 
