@@ -5,6 +5,7 @@ own layout. Multi-register values are stored low word first.
 """
 from __future__ import annotations
 
+from collections.abc import Callable, Collection
 from dataclasses import dataclass, field, replace
 from enum import StrEnum
 from functools import cache
@@ -46,6 +47,17 @@ class Kind(StrEnum):
     DIFFERENCE = "difference"
 
 
+class Coarse(StrEnum):
+    """Readings some units report ten times coarser than Deye's protocol documents.
+
+    No register tells which units do, so the coordinator works it out from the
+    readings themselves (see ``Family.unit_checks``).
+    """
+
+    POWER = "power"
+    BATTERY_CURRENT = "battery_current"
+
+
 DEVICE_STATES = ["standby", "self_test", "normal", "alarm", "fault"]
 
 # Deye displays fault bit n as code F(n+1).
@@ -82,6 +94,9 @@ class RegisterSensor:
     precision: int | None = None
     enabled: bool = True
     diagnostic: bool = False
+    coarse: Coarse | None = None
+    # PV string the sensor belongs to, when the unit may not have it.
+    string: int | None = None
 
 
 class ControlPlatform(StrEnum):
@@ -129,6 +144,13 @@ class Family:
     has_battery_modules: bool = False
     controls: tuple[Control, ...] = field(default=())
     rated_power: tuple[int, ...] = field(default=())
+    # Holds the MPPT count in bits 8-11.
+    mppt_register: int | None = None
+    # Each check returns True for coarse units, False for documented ones and
+    # None when the readings cannot tell.
+    unit_checks: tuple[tuple[Coarse, Callable[[dict[int, int]], bool | None]], ...] = field(
+        default=()
+    )
 
     @property
     def registers(self) -> set[int]:
@@ -136,7 +158,8 @@ class Family:
 
     @property
     def setting_registers(self) -> set[int]:
-        return {control.register for control in self.controls} | set(self.rated_power)
+        mppt = {self.mppt_register} if self.mppt_register is not None else set()
+        return {control.register for control in self.controls} | set(self.rated_power) | mppt
 
 
 def _words(regs: dict[int, int], addresses: tuple[int, ...]) -> int:
@@ -150,7 +173,10 @@ def _bits(value: int) -> list[int]:
     return [bit for bit in range(value.bit_length()) if value >> bit & 1]
 
 
-def decode(sensor: RegisterSensor, regs: dict[int, int]) -> Any:
+def decode(
+    sensor: RegisterSensor, regs: dict[int, int], coarse: Collection[Coarse] = ()
+) -> Any:
+    scale = sensor.scale * 10 if sensor.coarse in coarse else sensor.scale
     try:
         raw = _words(regs, sensor.registers)
     except KeyError:
@@ -170,14 +196,14 @@ def decode(sensor: RegisterSensor, regs: dict[int, int]) -> Any:
             return family_for(raw).name
         case Kind.DIFFERENCE:
             first, second = (regs[r] for r in sensor.registers)
-            return round((first - second) * sensor.scale, sensor.precision or 0)
+            return round((first - second) * scale, sensor.precision or 0)
         case Kind.CLOCK:
             a, b, c = (regs[r] for r in sensor.registers)
             return (
                 f"20{a >> 8:02d}-{a & 0xFF:02d}-{b >> 8:02d} "
                 f"{b & 0xFF:02d}:{c >> 8:02d}:{c & 0xFF:02d}"
             )
-    value = (raw - sensor.offset) * sensor.scale
+    value = (raw - sensor.offset) * scale
     if sensor.precision is not None:
         return round(value, sensor.precision)
     return value
@@ -350,6 +376,13 @@ def rated_power(family: Family, regs: dict[int, int]) -> float | None:
         return None
 
 
+def has_string(family: Family, sensor: RegisterSensor, regs: dict[int, int]) -> bool:
+    if sensor.string is None or family.mppt_register is None:
+        return True
+    count = regs.get(family.mppt_register, 0) >> 8 & 0x0F
+    return sensor.string <= (count or 2)
+
+
 TOU_SLOTS = 6
 
 
@@ -389,6 +422,71 @@ def tou_controls(time: int, power: int, voltage: int, soc: int, charge: int
     return tuple(controls)
 
 
+def _s16(value: int) -> int:
+    return value - 0x10000 if value >= 0x8000 else value
+
+
+# Some single phase units (a SUN-10K-SG02LP1-EU-AM3 among them) report grid, CT
+# and load power in 10 W and battery current in 0.1 A, while others (the
+# SUN-6K-SG05LP1-EU-AM2-P) use the documented 1 W and 0.01 A. Rated power,
+# MPPT count and firmware words differ between such units but none is known to
+# mark the units, and ha-solarman leaves the choice to the user. Both cases are
+# told apart instead with readings whose units do not vary.
+SINGLE_PHASE_GRID = 0x00A9
+SINGLE_PHASE_LOAD = 0x00B2
+SINGLE_PHASE_INVERTER = 0x00AF
+SINGLE_PHASE_BATTERY_VOLTAGE = 0x00B7
+SINGLE_PHASE_BATTERY_POWER = 0x00BE
+SINGLE_PHASE_BATTERY_CURRENT = 0x00BF
+# Below these the readings are too small to tell the units apart.
+MIN_CHECK_POWER = 500  # W
+MIN_CHECK_CURRENT = 5  # A
+
+
+def _single_phase_power_coarse(regs: dict[int, int]) -> bool | None:
+    """Grid plus inverter output equals load, in whichever units balance it.
+
+    Inverter power is in 1 W on every unit. On a coarse unit the documented
+    units leave 90% of the inverter power unbalanced, on a documented one the
+    coarse units leave 900%, so the margin is wide.
+    """
+    try:
+        grid, load, inverter = (
+            _s16(regs[r])
+            for r in (SINGLE_PHASE_GRID, SINGLE_PHASE_LOAD, SINGLE_PHASE_INVERTER)
+        )
+    except KeyError:
+        return None
+    if abs(inverter) < MIN_CHECK_POWER:
+        return None
+    fine = abs(grid + inverter - load)
+    coarse = abs(10 * grid + inverter - 10 * load)
+    limit = 0.3 * abs(inverter)
+    if coarse <= limit < fine:
+        return True
+    if fine <= limit < coarse:
+        return False
+    return None
+
+
+def _single_phase_battery_current_coarse(regs: dict[int, int]) -> bool | None:
+    """Battery current against battery power over voltage, both in fixed units."""
+    try:
+        voltage = regs[SINGLE_PHASE_BATTERY_VOLTAGE] * 0.01
+        power = _s16(regs[SINGLE_PHASE_BATTERY_POWER])
+        current = _s16(regs[SINGLE_PHASE_BATTERY_CURRENT]) * 0.01
+    except KeyError:
+        return None
+    if not voltage or abs(power / voltage) < MIN_CHECK_CURRENT:
+        return None
+    ratio = current / (power / voltage)
+    if 0.07 <= ratio <= 0.14:
+        return True
+    if 0.7 <= ratio <= 1.4:
+        return False
+    return None
+
+
 # SUN-*K-SG0*LP1
 SINGLE_PHASE = Family(
     key="single_phase_hybrid",
@@ -404,18 +502,19 @@ SINGLE_PHASE = Family(
                        registers=(0x00B8,),
                        unit=PERCENTAGE, device_class=SensorDeviceClass.BATTERY),
         volts("battery_voltage", "Battery voltage", 0x00B7, scale=0.01),
-        amps("battery_current", "Battery current", 0x00BF),
+        amps("battery_current", "Battery current", 0x00BF, coarse=Coarse.BATTERY_CURRENT),
         power("battery_power", "Battery power", 0x00BE),
         temperature("battery_temperature", "Battery temperature", 0x00B6),
         volts("grid_voltage", "Grid voltage", 0x0096),
         hertz("grid_frequency", "Grid frequency", 0x004F),
-        power("grid_power", "Grid power", 0x00A9),
+        power("grid_power", "Grid power", 0x00A9, coarse=Coarse.POWER),
         amps("grid_current", "Grid current", 0x00A0, enabled=False),
-        power("external_ct_power", "External CT power", 0x00AC, enabled=False),
+        power("external_ct_power", "External CT power", 0x00AC, enabled=False,
+              coarse=Coarse.POWER),
         volts("output_voltage", "Output voltage", 0x009C, enabled=False),
         hertz("output_frequency", "Output frequency", 0x00C1, enabled=False),
         power("inverter_power", "Inverter power", 0x00AF),
-        power("load_power", "Load power", 0x00B2),
+        power("load_power", "Load power", 0x00B2, coarse=Coarse.POWER),
         hertz("load_frequency", "Load frequency", 0x00C0, enabled=False),
         volts("load_voltage", "Load voltage", 0x009D, enabled=False),
         power("pv1_power", "PV1 power", 0x00BA, kind=Kind.U16),
@@ -424,6 +523,14 @@ SINGLE_PHASE = Family(
         amps("pv1_current", "PV1 current", 0x006E, scale=0.1, kind=Kind.U16, enabled=False),
         volts("pv2_voltage", "PV2 voltage", 0x006F, enabled=False),
         amps("pv2_current", "PV2 current", 0x0070, scale=0.1, kind=Kind.U16, enabled=False),
+        power("pv3_power", "PV3 power", 0x00BC, kind=Kind.U16, string=3),
+        power("pv4_power", "PV4 power", 0x00BD, kind=Kind.U16, string=4),
+        volts("pv3_voltage", "PV3 voltage", 0x0071, enabled=False, string=3),
+        amps("pv3_current", "PV3 current", 0x0072, scale=0.1, kind=Kind.U16, enabled=False,
+             string=3),
+        volts("pv4_voltage", "PV4 voltage", 0x0073, enabled=False, string=4),
+        amps("pv4_current", "PV4 current", 0x0074, scale=0.1, kind=Kind.U16, enabled=False,
+             string=4),
         power("generator_power", "Generator power", 0x00A6, kind=Kind.U16, enabled=False),
         temperature("dc_temperature", "DC temperature", 0x005A),
         temperature("ac_temperature", "AC temperature", 0x005B),
@@ -442,6 +549,11 @@ SINGLE_PHASE = Family(
         *bms(0x0138),
     ),
     rated_power=(0x0010, 0x0011),
+    mppt_register=0x0012,
+    unit_checks=(
+        (Coarse.POWER, _single_phase_power_coarse),
+        (Coarse.BATTERY_CURRENT, _single_phase_battery_current_coarse),
+    ),
     controls=(
         _current("max_charge_current", "Battery max charge current", 0x00D2, config=False),
         _current("max_discharge_current", "Battery max discharge current", 0x00D3,

@@ -15,7 +15,7 @@ from homeassistant.core import HomeAssistant
 
 from . import DeyeLocalConfigEntry
 from .const import CONF_SERIAL
-from .models import MAX_BATTERIES, REG_SERIAL, battery_serial_block
+from .models import MAX_BATTERIES, REG_SERIAL, battery_serial_block, decode
 
 TO_REDACT = {CONF_ADDRESS, CONF_SERIAL}
 _MAC = re.compile(r"([0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}")
@@ -69,6 +69,14 @@ async def async_get_config_entry_diagnostics(
             "handshake": coordinator.transport.logger_type,
         },
         "last_error": coordinator.last_error,
+        "coarse": sorted(coordinator.coarse),
+        # What the entities show, so a report can be checked against the
+        # inverter or the Deye Cloud without screenshots.
+        "values": {
+            sensor.key: decode(sensor, coordinator.data or {}, coordinator.coarse)
+            for sensor in family.sensors
+            if not set(sensor.registers) & hidden
+        },
         "batteries": [
             {"slot": index + 1, "serial": REDACTED}
             for index in sorted(coordinator.battery_slots.values())

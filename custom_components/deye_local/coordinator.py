@@ -18,16 +18,19 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, Upda
 
 from .const import (
     BATTERY_SCAN_INTERVAL,
+    CONF_COARSE,
     DOMAIN,
     MAX_BLOCK,
     SETTINGS_INTERVAL,
     STALE_TIMEOUT,
+    UNIT_CHECK_POLLS,
     WRITE_VERIFY_DELAY,
     WRITE_VERIFY_TIMEOUT,
 )
 from .models import (
     IDENTITY_BLOCK,
     MAX_BATTERIES,
+    Coarse,
     Control,
     Family,
     battery_sensors,
@@ -81,6 +84,9 @@ class DeyeLocalCoordinator(DataUpdateCoordinator[dict[int, int]]):
         self._session_lock = asyncio.Lock()
         self.rssi: int | None = None
         self.source: str | None = None
+        self.coarse = {Coarse(c) for c in entry.data.get(CONF_COARSE, ())}
+        # Reading group -> (latest verdict, polls in a row that gave it).
+        self._unit_votes: dict[Coarse, tuple[bool, int]] = {}
 
     def update_advertisement(self, info: BluetoothServiceInfoBleak) -> None:
         """Track the logger's latest advertisement: route and signal strength."""
@@ -122,7 +128,33 @@ class DeyeLocalCoordinator(DataUpdateCoordinator[dict[int, int]]):
         self._registers = snapshot
         self._last_success = time.monotonic()
         self.last_error = None
+        self._check_units(snapshot)
         return snapshot
+
+    def _check_units(self, snapshot: dict[int, int]) -> None:
+        coarse = set(self.coarse)
+        for group, check in self.family.unit_checks:
+            verdict = check(snapshot)
+            if verdict is None:
+                continue
+            last, count = self._unit_votes.get(group, (verdict, 0))
+            count = count + 1 if last == verdict else 1
+            self._unit_votes[group] = (verdict, count)
+            if count >= UNIT_CHECK_POLLS and verdict != (group in coarse):
+                _LOGGER.info(
+                    "Inverter reports %s in %s units",
+                    group.value.replace("_", " "), "coarse" if verdict else "documented",
+                )
+                if verdict:
+                    coarse.add(group)
+                else:
+                    coarse.discard(group)
+        if coarse != self.coarse:
+            self.coarse = coarse
+            entry = self.config_entry
+            self.hass.config_entries.async_update_entry(
+                entry, data={**entry.data, CONF_COARSE: sorted(coarse)}
+            )
 
     def _settings_due(self) -> bool:
         if not self.settings_blocks:

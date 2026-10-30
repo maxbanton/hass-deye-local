@@ -29,6 +29,7 @@ from .models import (
     battery_sensors,
     decode,
     describe_codes,
+    has_string,
 )
 
 PARALLEL_UPDATES = 0
@@ -40,8 +41,11 @@ async def async_setup_entry(
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
     coordinator = entry.runtime_data
+    family = coordinator.family
     entities: list[SensorEntity] = [
-        DeyeRegisterSensor(coordinator, sensor) for sensor in coordinator.family.sensors
+        DeyeRegisterSensor(coordinator, sensor)
+        for sensor in family.sensors
+        if has_string(family, sensor, coordinator.data or {})
     ]
     entities.append(SignalStrengthSensor(coordinator, "signal_strength"))
     async_add_entities(entities)
@@ -90,7 +94,7 @@ class _RegisterValue:
 
     @property
     def native_value(self) -> Any:
-        return decode(self.sensor, self.coordinator.data or {})
+        return decode(self.sensor, self.coordinator.data or {}, self.coordinator.coarse)
 
     @property
     def available(self) -> bool:
