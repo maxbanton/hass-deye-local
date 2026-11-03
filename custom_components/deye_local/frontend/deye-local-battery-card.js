@@ -4,8 +4,9 @@
 
 const DOMAIN = "deye_local";
 const TYPE = "deye-local-battery-card";
-// Battery power is negative while the battery charges; below this it counts as idle.
-const IDLE_WATTS = 20;
+// Battery power is negative while the battery charges. An idle battery still shows a
+// few tens of watts either way, which would make runtimes of days; below this it is idle.
+const IDLE_WATTS = 50;
 const RED_BELOW = 20;
 const AMBER_BELOW = 50;
 // Below this the inverter is off grid: it reports no frequency without a grid.

@@ -353,7 +353,7 @@ left, the runtime becomes the headline and the battery a bar below it.
 - The fill is red below 20 %, amber below 50 % and green above; both levels
   are options.
 - The status shows charging or discharging and at what power, or idle when
-  less than 20 W flows either way. While power flows, stripes run toward the
+  less than 50 W flows either way. While power flows, stripes run toward the
   battery's tip when it charges and away from it when it discharges. With
   reduced motion turned on in your system, they stand still.
 - Marks under the battery show the limits the inverter works to: **Target**,
