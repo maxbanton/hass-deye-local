@@ -44,8 +44,9 @@ const STYLE = `
   .fill {
     position: relative; overflow: hidden; height: 100%; border-radius: 5px;
     background: var(--battery-color);
-    transition: width 0.8s ease, background-color 0.8s ease;
   }
+  /* Changes slide; the first draw does not, so the card opens at its charge. */
+  ha-card.ready .fill { transition: width 0.8s ease, background-color 0.8s ease; }
   .charging .fill::after, .discharging .fill::after {
     content: ""; position: absolute; inset: 0;
     background-image: linear-gradient(45deg,
@@ -66,8 +67,8 @@ const STYLE = `
   .value.on-fill {
     color: rgba(0, 0, 0, 0.87);
     clip-path: inset(0 calc(100% - 3px - (100% - 6px) * var(--level)) 0 0);
-    transition: clip-path 0.8s ease;
   }
+  ha-card.ready .value.on-fill { transition: clip-path 0.8s ease; }
 
   /* A limit: a solid mark through the battery's edge, a dashed tick and a label. */
   .notch {
@@ -130,7 +131,7 @@ const STYLE = `
 
   @media (prefers-reduced-motion: reduce) {
     .charging .fill::after, .discharging .fill::after { animation: none; }
-    .fill, .value.on-fill { transition: none; }
+    ha-card.ready .fill, ha-card.ready .value.on-fill { transition: none; }
   }
 `;
 
@@ -265,11 +266,21 @@ class BatteryCard extends HTMLElement {
   }
 
   connectedCallback() {
+    // Dashboards build cards before placing them, when they have no width yet. Laying
+    // out here, before the first paint, keeps a wide card from showing compact first.
+    this._layout();
     if (!this._resize && "ResizeObserver" in window) {
       this._resize = new ResizeObserver(() => this._layout());
       this._resize.observe(this);
     }
-    requestAnimationFrame(() => this._layout());
+    this._settle();
+  }
+
+  // Turns the slide animations on once the card has been drawn with its real values.
+  _settle() {
+    if (this._settling || !this._r || !this.isConnected) return;
+    this._settling = true;
+    requestAnimationFrame(() => requestAnimationFrame(() => this._r.card.classList.add("ready")));
   }
 
   disconnectedCallback() {
@@ -494,6 +505,7 @@ class BatteryCard extends HTMLElement {
     const marked = [showTarget && `target ${Math.round(slotSoc)}%`, showShutdown && `shutdown ${Math.round(shutdown)}%`];
     r.card.setAttribute("aria-label", [name, shown, statusText, runtime?.text, ...marked].filter(Boolean).join(", "));
     this._layout();
+    this._settle();
   }
 
   // Layout needs the card's width, so it runs again whenever the card is resized.
