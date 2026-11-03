@@ -1,6 +1,11 @@
-// The core is loaded with this file's version query so an update never pairs a
-// new card with a cached old core.
-const { defineTouCard } = await import(`./tou-card-core.js${new URL(import.meta.url).search}`);
+// The integration's one dashboard resource: it loads both cards. Each file is
+// loaded with this file's version query so an update never pairs it with a
+// cached old copy.
+const version = new URL(import.meta.url).search;
+const [{ defineTouCard }] = await Promise.all([
+  import(`./tou-card-core.js${version}`),
+  import(`./deye-local-battery-card.js${version}`),
+]);
 
 defineTouCard({
   domain: "deye_local",

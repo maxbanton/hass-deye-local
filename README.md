@@ -52,6 +52,9 @@ than a Bluetooth adapter or an ESPHome Bluetooth proxy in range.
   pattern, work mode, grid charging, the six time of use slots, max sell and
   zero export power, and grid peak shaving. Every change is read back from
   the inverter and reported as an error if it did not stick.
+- **Two dashboard cards**: a Time Of Use editor laid out like the inverter's
+  screen, and a battery that fills with the state of charge and shows how long
+  it lasts at the present power.
 
 ## What you need
 
@@ -326,6 +329,66 @@ data:
     - {}
     - {}
     - {}
+```
+
+## Battery card
+
+A battery that fills with the state of charge and shows how long it lasts, for
+a dashboard you check at a glance. It loads with the integration, like the Time
+Of Use card.
+
+![Battery card](https://raw.githubusercontent.com/maxbanton/hass-deye-local/main/docs/battery-card.png)
+
+Add it from the dashboard editor (**Add card**, then search for **Deye Local
+Battery**), or in YAML:
+
+```yaml
+type: custom:deye-local-battery-card
+```
+
+The card picks its layout from the space it gets. Narrow, as on the right
+above, it is a battery with the charge inside. Given a whole column, as on the
+left, the runtime becomes the headline and the battery a bar below it.
+
+- The fill is red below 20 %, amber below 50 % and green above; both levels
+  are options.
+- The status shows charging or discharging and at what power, or idle when
+  less than 20 W flows either way. While power flows, stripes run toward the
+  battery's tip when it charges and away from it when it discharges. With
+  reduced motion turned on in your system, they stand still.
+- Marks under the battery show the limits the inverter works to: **Target**,
+  the SOC of the time of use slot in force, and **Shutdown**, the Battery
+  shutdown SOC. A limit at 0 % or 100 % is not marked.
+- The runtime is worked out from the present voltage and power, so it is
+  rough: the power changes, and charging slows down near full.
+
+| The battery is | The runtime shows |
+|---|---|
+| charging from the grid in a time of use slot, below the slot's SOC | **80% in ~50 min**, until it reaches the slot's SOC |
+| charging otherwise, from solar for example | **Full in ~1 h 20 min** |
+| discharging while the grid is up | **80% in ~1 h 5 min**, until it reaches the slot's SOC, where the inverter takes over from the grid |
+| discharging during an outage | **Lasts ~7 h 40 min**, until the Battery shutdown SOC |
+
+The card tells the grid is down from the inverter's **Grid frequency**, which
+drops to 0 without a grid.
+
+Tap the card for the SOC sensor's details and history.
+
+The card finds the inverter's sensors by itself. Options, all of them in the
+card editor:
+
+| Option | Description |
+|---|---|
+| `device` | The inverter, when you have more than one. |
+| `name` | The card's name, `Battery` by default. |
+| `capacity` | Battery capacity in Ah, for the runtime estimate. Without it the card adds up the modules' **Capacity** sensors, which are disabled by default; enable them on each battery module device, or set this. With neither, the runtime is not shown. |
+| `shutdown_soc` | Where the discharge estimate stops, for inverters that do not report their Battery shutdown SOC. Without either, it runs to 0 %, which overstates the runtime. |
+| `red_below` | The fill is red below this SOC, 20 by default. |
+| `amber_below` | The fill is amber below this SOC and green from it, 50 by default. |
+
+```yaml
+type: custom:deye-local-battery-card
+capacity: 200
 ```
 
 ## Battery modules
