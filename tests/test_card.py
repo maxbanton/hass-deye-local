@@ -54,12 +54,18 @@ async def test_card_files_are_served(hass: HomeAssistant, resources) -> None:
     assert (FRONTEND_PATH / "deye-local-tou-card.js").is_file()
     assert (FRONTEND_PATH / "tou-card-core.js").is_file()
     assert (FRONTEND_PATH / "deye-local-battery-card.js").is_file()
+    assert (FRONTEND_PATH / "battery-card-logic.js").is_file()
 
 
 def test_the_resource_loads_both_cards_with_its_version() -> None:
     entry = (FRONTEND_PATH / "deye-local-tou-card.js").read_text()
     assert "import(`./tou-card-core.js${version}`)" in entry
     assert "import(`./deye-local-battery-card.js${version}`)" in entry
+
+
+def test_battery_card_loads_its_rules_with_its_version() -> None:
+    card = (FRONTEND_PATH / "deye-local-battery-card.js").read_text()
+    assert "import(`./battery-card-logic.js${new URL(import.meta.url).search}`)" in card
 
 
 def test_battery_card_reads_sensors_every_family_has() -> None:

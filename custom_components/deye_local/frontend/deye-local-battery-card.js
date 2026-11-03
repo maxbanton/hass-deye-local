@@ -2,17 +2,15 @@
 // with whether it is charging or discharging, at what power and for how long.
 // Narrow, it is a compact battery; wide, the runtime becomes the headline.
 
+// The rules live in battery-card-logic.js, loaded with this file's version query so an
+// update never pairs this card with a cached old copy.
+const {
+  AMBER_BELOW, RED_BELOW, activeSlot, batteryMode, clockMinutes, levelColor, numberOrNull,
+  runtime: estimate, shownLimits, totalCapacity,
+} = await import(`./battery-card-logic.js${new URL(import.meta.url).search}`);
+
 const DOMAIN = "deye_local";
 const TYPE = "deye-local-battery-card";
-// Battery power is negative while the battery charges. An idle battery still shows a
-// few tens of watts either way, which would make runtimes of days; below this it is idle.
-const IDLE_WATTS = 50;
-const RED_BELOW = 20;
-const AMBER_BELOW = 50;
-// Below this the inverter is off grid: it reports no frequency without a grid.
-const GRID_HZ = 40;
-// Longer charge estimates are not shown.
-const MAX_CHARGE_HOURS = 24;
 // From this card width on, the wide layout is used.
 const WIDE_PX = 300;
 
@@ -165,44 +163,11 @@ function entityOf(hass, device, key) {
   );
 }
 
-function color(level, redBelow, amberBelow) {
-  if (level < redBelow) return "var(--error-color, #db4437)";
-  if (level < amberBelow) return "var(--warning-color, #ffa600)";
-  return "var(--success-color, #43a047)";
-}
-
-function numberOrNull(value) {
-  const n = Number(value);
-  return value !== undefined && value !== null && value !== "" && Number.isFinite(n) ? n : null;
-}
-
-// Whole hours and minutes in 5 minute steps; past 10 hours the minutes are noise,
-// and past two days so are the hours.
-function durationParts(hours) {
-  const minutes = Math.max(5, Math.round((hours * 60) / 5) * 5);
-  if (minutes < 60) return [[minutes, "min"]];
-  if (hours >= 48) return [[Math.round(hours / 24), "days"]];
-  if (hours >= 10) return [[Math.round(hours), "h"]];
-  const rest = minutes % 60;
-  return rest ? [[Math.floor(minutes / 60), "h"], [rest, "min"]] : [[minutes / 60, "h"]];
-}
-
-function clockMinutes(value) {
-  const match = String(value || "").match(/^(\d{1,2}):(\d{2})/);
-  return match ? Number(match[1]) * 60 + Number(match[2]) : null;
-}
-
-// The slot in force now: the last one that started today, or else the last of the
-// day before, since the table wraps around midnight.
-function activeSlot(schedule, now) {
-  const slots = (Array.isArray(schedule) ? schedule : [])
-    .map((slot) => ({ slot, start: clockMinutes(slot?.time) }))
-    .filter((s) => s.start !== null);
-  if (!slots.length) return null;
-  const started = slots.filter((s) => s.start <= now);
-  const pick = (list) => list.reduce((a, b) => (b.start > a.start ? b : a));
-  return pick(started.length ? started : slots).slot;
-}
+const COLORS = {
+  red: "var(--error-color, #db4437)",
+  amber: "var(--warning-color, #ffa600)",
+  green: "var(--success-color, #43a047)",
+};
 
 function overlap(a, b, gap = 4) {
   const x = a.getBoundingClientRect();
@@ -361,13 +326,6 @@ class BatteryCard extends HTMLElement {
     return `${new Intl.NumberFormat(this._locale(), { maximumFractionDigits: 1 }).format(abs / 1000)} kW`;
   }
 
-  _capacity(sources) {
-    const configured = numberOrNull(this._config.capacity);
-    if (configured) return configured;
-    const modules = sources.modules.map((id) => this._value(id));
-    return modules.length && modules.every((v) => v > 0) ? modules.reduce((a, b) => a + b, 0) : null;
-  }
-
   // The active time of use slot and the shutdown SOC, from the inverter or the card's option.
   _limits(sources) {
     const tou = this._hass.states[sources.tou];
@@ -377,38 +335,6 @@ class BatteryCard extends HTMLElement {
       slotSoc: numberOrNull(slot?.batt),
       shutdown: this._value(sources.shutdown) ?? numberOrNull(this._config.shutdown_soc),
     };
-  }
-
-  // The time of use slot's SOC is the grid charge target, and while the grid is up
-  // the battery does not discharge below it. Off grid it runs down to the shutdown SOC.
-  _target(sources, soc, mode) {
-    const { slot, slotSoc, shutdown: known } = this._limits(sources);
-    if (mode === "charging") {
-      return slot?.grid_charge && slotSoc !== null && slotSoc > soc ? slotSoc : 100;
-    }
-    const shutdown = known ?? 0;
-    const onGrid = (this._value(sources.frequency) ?? 0) >= GRID_HZ;
-    return onGrid && slotSoc !== null && slotSoc > shutdown ? slotSoc : shutdown;
-  }
-
-  // Rough, like the inverter app's: linear in SOC, at the present voltage and power.
-  _runtime(sources, soc, power, mode) {
-    if (mode !== "charging" && mode !== "discharging") return null;
-    const capacity = this._capacity(sources);
-    const voltage = this._value(sources.voltage);
-    if (!capacity || !voltage) return null;
-    const target = this._target(sources, soc, mode);
-    if ((mode === "charging" && soc >= target) || (mode === "discharging" && soc <= target)) return null;
-    const hours = ((Math.abs(target - soc) / 100) * capacity * voltage) / Math.abs(power);
-    // Charging that slow is a trickle, not something to plan around; a long
-    // discharge on a small load is real and stays.
-    if (mode === "charging" && hours > MAX_CHARGE_HOURS) return null;
-    const parts = durationParts(hours);
-    // "Lasts" only when the battery runs to its end; on grid the inverter switches over at the slot SOC.
-    let label;
-    if (mode === "discharging" && target <= (this._limits(sources).shutdown ?? 0)) label = "Lasts";
-    else label = target >= 100 ? "Full in" : `${Math.round(target)}% in`;
-    return { label, parts, text: `${label} ~${parts.map(([n, u]) => `${n} ${u}`).join(" ")}` };
   }
 
   _moreInfo() {
@@ -505,14 +431,23 @@ class BatteryCard extends HTMLElement {
     const level = known ? Math.min(Math.max(soc, 0), 100) : 0;
     const shown = known ? `${Math.round(level)}%` : "?";
     const power = this._value(sources.power);
-    let mode = null;
-    if (known && power !== null) {
-      mode = Math.abs(power) < IDLE_WATTS ? "idle" : power < 0 ? "charging" : "discharging";
-    }
+    const mode = batteryMode(soc, power);
+    const limits = this._limits(sources);
     const statusText = known
       ? { idle: "Idle", charging: `Charging ${this._watts(power ?? 0)}`, discharging: `Discharging ${this._watts(power ?? 0)}` }[mode]
       : "Unavailable";
-    const runtime = known ? this._runtime(sources, level, power, mode) : null;
+    const runtime = known
+      ? estimate({
+          mode,
+          soc: level,
+          power,
+          capacity: totalCapacity(this._config.capacity, sources.modules.map((id) => this._value(id))),
+          voltage: this._value(sources.voltage),
+          slot: limits.slot,
+          shutdown: limits.shutdown,
+          gridHz: this._value(sources.frequency),
+        })
+      : null;
     const name = this._config.name || "Battery";
 
     r.battery.classList.toggle("charging", mode === "charging");
@@ -541,13 +476,11 @@ class BatteryCard extends HTMLElement {
 
     const redBelow = numberOrNull(this._config.red_below) ?? RED_BELOW;
     const amberBelow = numberOrNull(this._config.amber_below) ?? AMBER_BELOW;
-    r.card.style.setProperty("--battery-color", color(level, redBelow, amberBelow));
+    r.card.style.setProperty("--battery-color", COLORS[levelColor(level, redBelow, amberBelow)]);
     r.card.style.setProperty("--level", String(level / 100));
 
-    // A limit at either end of the battery says nothing the battery itself does not.
-    const { slotSoc, shutdown } = this._limits(sources);
-    const showShutdown = shutdown !== null && shutdown > 0 && shutdown < 100;
-    const showTarget = slotSoc !== null && slotSoc > 0 && slotSoc < 100 && slotSoc !== shutdown;
+    const { slotSoc, shutdown } = limits;
+    const { shutdown: showShutdown, target: showTarget } = shownLimits(slotSoc, shutdown);
     for (const [limit, value, show] of [[r.target, slotSoc, showTarget], [r.shutdown, shutdown, showShutdown]]) {
       limit.notch.hidden = limit.tick.hidden = !show;
       if (!show) continue;
@@ -558,8 +491,8 @@ class BatteryCard extends HTMLElement {
     }
     r.down.hidden = !showTarget && !showShutdown;
 
-    const limits = [showTarget && `target ${Math.round(slotSoc)}%`, showShutdown && `shutdown ${Math.round(shutdown)}%`];
-    r.card.setAttribute("aria-label", [name, shown, statusText, runtime?.text, ...limits].filter(Boolean).join(", "));
+    const marked = [showTarget && `target ${Math.round(slotSoc)}%`, showShutdown && `shutdown ${Math.round(shutdown)}%`];
+    r.card.setAttribute("aria-label", [name, shown, statusText, runtime?.text, ...marked].filter(Boolean).join(", "));
     this._layout();
   }
 
