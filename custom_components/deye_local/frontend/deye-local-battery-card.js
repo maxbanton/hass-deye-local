@@ -11,6 +11,8 @@ const RED_BELOW = 20;
 const AMBER_BELOW = 50;
 // Below this the inverter is off grid: it reports no frequency without a grid.
 const GRID_HZ = 40;
+// Longer charge estimates are not shown.
+const MAX_CHARGE_HOURS = 24;
 // From this card width on, the wide layout is used.
 const WIDE_PX = 300;
 
@@ -174,10 +176,12 @@ function numberOrNull(value) {
   return value !== undefined && value !== null && value !== "" && Number.isFinite(n) ? n : null;
 }
 
-// Whole hours and minutes in 5 minute steps; past 10 hours the minutes are noise.
+// Whole hours and minutes in 5 minute steps; past 10 hours the minutes are noise,
+// and past two days so are the hours.
 function durationParts(hours) {
   const minutes = Math.max(5, Math.round((hours * 60) / 5) * 5);
   if (minutes < 60) return [[minutes, "min"]];
+  if (hours >= 48) return [[Math.round(hours / 24), "days"]];
   if (hours >= 10) return [[Math.round(hours), "h"]];
   const rest = minutes % 60;
   return rest ? [[Math.floor(minutes / 60), "h"], [rest, "min"]] : [[minutes / 60, "h"]];
@@ -396,6 +400,9 @@ class BatteryCard extends HTMLElement {
     const target = this._target(sources, soc, mode);
     if ((mode === "charging" && soc >= target) || (mode === "discharging" && soc <= target)) return null;
     const hours = ((Math.abs(target - soc) / 100) * capacity * voltage) / Math.abs(power);
+    // Charging that slow is a trickle, not something to plan around; a long
+    // discharge on a small load is real and stays.
+    if (mode === "charging" && hours > MAX_CHARGE_HOURS) return null;
     const parts = durationParts(hours);
     // "Lasts" only when the battery runs to its end; on grid the inverter switches over at the slot SOC.
     let label;

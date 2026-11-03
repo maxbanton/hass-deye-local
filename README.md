@@ -360,7 +360,8 @@ left, the runtime becomes the headline and the battery a bar below it.
   the SOC of the time of use slot in force, and **Shutdown**, the Battery
   shutdown SOC. A limit at 0 % or 100 % is not marked.
 - The runtime is worked out from the present voltage and power, so it is
-  rough: the power changes, and charging slows down near full.
+  rough: the power changes, and charging slows down near full. Charging that
+  would take more than a day is not estimated.
 
 | The battery is | The runtime shows |
 |---|---|
