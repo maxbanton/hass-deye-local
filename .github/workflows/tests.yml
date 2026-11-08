@@ -17,6 +17,16 @@ jobs:
       - run: pip install ruff
       - run: ruff check .
 
+  cards:
+    name: test (cards)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: node --test "tests/js/*.test.mjs"
+
   test:
     name: test (${{ matrix.home-assistant }})
     runs-on: ubuntu-latest

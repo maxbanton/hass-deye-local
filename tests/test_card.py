@@ -1,4 +1,4 @@
-"""The time of use card: served by the integration and loaded on the dashboards."""
+"""The dashboard cards: served by the integration and loaded on the dashboards."""
 from __future__ import annotations
 
 from types import SimpleNamespace
@@ -14,6 +14,7 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.deye_local.card import CARD_URL, FRONTEND_PATH
 from custom_components.deye_local.const import DOMAIN
+from custom_components.deye_local.models import FAMILIES
 
 from .test_init import (  # noqa: F401
     _setup,
@@ -52,6 +53,28 @@ async def test_card_files_are_served(hass: HomeAssistant, resources) -> None:
     assert paths[0].url_path == "/deye_local/frontend"
     assert (FRONTEND_PATH / "deye-local-tou-card.js").is_file()
     assert (FRONTEND_PATH / "tou-card-core.js").is_file()
+    assert (FRONTEND_PATH / "deye-local-battery-card.js").is_file()
+    assert (FRONTEND_PATH / "battery-card-logic.js").is_file()
+
+
+def test_the_resource_loads_both_cards_with_its_version() -> None:
+    entry = (FRONTEND_PATH / "deye-local-tou-card.js").read_text()
+    assert "import(`./tou-card-core.js${version}`)" in entry
+    assert "import(`./deye-local-battery-card.js${version}`)" in entry
+
+
+def test_battery_card_loads_its_rules_with_its_version() -> None:
+    card = (FRONTEND_PATH / "deye-local-battery-card.js").read_text()
+    assert "import(`./battery-card-logic.js${new URL(import.meta.url).search}`)" in card
+
+
+def test_battery_card_reads_sensors_every_family_has() -> None:
+    card = (FRONTEND_PATH / "deye-local-battery-card.js").read_text()
+    assert 'const DOMAIN = "deye_local";' in card
+    for key in ("battery_soc", "battery_power"):
+        assert f'"{key}"' in card
+        for family in FAMILIES:
+            assert key in {sensor.key for sensor in family.sensors}, family.key
 
 
 async def test_card_is_added_to_the_dashboard_resources(hass: HomeAssistant, resources) -> None:
