@@ -39,7 +39,7 @@ class Kind(StrEnum):
     S16 = "s16"
     U32 = "u32"
     S32 = "s32"
-    # Signed 32-bit whose high word some three-phase models update apart from the
+    # Signed 32-bit value whose high word some three-phase models update apart from the
     # low word: near 0 W the two can disagree in sign, so a high word of 0x0000 or
     # 0xFFFF only extends the signed low word.
     S32_LOW_SIGNED = "s32_low_signed"

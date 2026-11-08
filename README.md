@@ -22,9 +22,9 @@ into it. No cloud, no internet, no extra wiring.
 ## Why this exists
 
 Newer Deye data loggers (the WiBLE generation, firmware `DYDA_WiBLE_*`) close
-their local Modbus ports: `8899` and `502` are shut, so the Solarman based
+their local Modbus ports: `8899` and `502` are shut, so the Solarman-based
 integrations cannot connect, and there is no firmware rollback. That leaves the
-Deye Cloud (data 3 to 5 minutes late, quota limited) or extra hardware wired to
+Deye Cloud (data 3 to 5 minutes late, quota-limited) or extra hardware wired to
 the inverter's RS485 port.
 
 The logger does keep one local door open: its Bluetooth link, which the Deye app
@@ -35,26 +35,26 @@ than a Bluetooth adapter or an ESPHome Bluetooth proxy in range.
 
 ## What it gives you
 
-- **Near real time data.** The logger answers from a cache the inverter refreshes
+- Near real-time data. The logger answers from a cache the inverter refreshes
   every few seconds. Values update every 30 seconds by default, or every 10
   seconds with the connection kept open, compared with 3 to 5 minutes through
   the cloud.
-- **Works without the internet.** Useful exactly when the grid or the connection
+- Works without the internet. Useful exactly when the grid or the connection
   is down.
-- **Inverter state, alarms and fault codes.** A fault such as `F13` (working mode
+- Inverter state, alarms and fault codes. A fault such as `F13` (working mode
   changed) shows up in Home Assistant within seconds, with its description as an
   attribute, so you can alert on it.
-- **Battery BMS data**: BMS SOC, voltage and current, the charge and discharge
+- Battery BMS data: BMS SOC, voltage and current, the charge and discharge
   limits the BMS asks for, and per-module data for each battery.
-- **Energy counters** with the right state classes for the Energy dashboard.
-- **Settings you can change** on single phase hybrids: battery charge and
+- Energy counters with the right state classes for the Energy dashboard.
+- Settings you can change on single phase hybrids: battery charge and
   discharge current, grid charge current, shutdown, restart and low SOC, energy
   pattern, work mode, grid charging, the six time of use slots, max sell and
   zero export power, and grid peak shaving. Low voltage three phase hybrids get
   the same settings (experimental). Every change is read back
   from the inverter and reported as an error if it did not stick.
-- **Two dashboard cards**: a Time Of Use editor laid out like the inverter's
-  screen, and a battery that fills with the state of charge and shows how long
+- Two dashboard cards: a Time Of Use editor laid out like the inverter's
+  screen, and a battery that fills to the state of charge and shows how long
   it lasts at the present power.
 
 ## What you need
@@ -115,7 +115,7 @@ app freeze until the connection closes. That is why the integration connects for
 each poll and releases the logger in between by default (see [Options](#options)).
 
 The Deye app's local Bluetooth mode needs the logger to itself. When you need it
-on site, disable the Deye Local entry (**Settings > Devices & Services > Deye
+on site, disable the Deye Local entry (**Settings > Devices & services > Deye
 Local**, three-dot menu, **Disable**), which releases the logger, and enable it
 again afterwards.
 
@@ -127,17 +127,17 @@ picks the matching register map.
 | Family | Models | Status |
 |--------|--------|--------|
 | Single phase hybrid | `SUN-*K-SG0*LP1`, for example SUN-3.6K-SG03LP1-EU, SUN-6K-SG05LP1-EU, SUN-8K-SG01LP1-EU | Supported, verified on a SUN-6K-SG05LP1-EU-AM2-P, reported working on a SUN-10K-SG02LP1-EU-AM3 |
-| Three phase hybrid, low and high voltage | `SUN-*K-SG0*LP3` and `SUN-*K-SG0*HP3`, for example SUN-12K-SG04LP3-EU, SUN-10K-SG01HP3-EU-AM2 | Experimental, reported working on a SUN-10K-SG05LP3-EU-SM2 |
+| Three phase hybrid, low and high voltage | `SUN-*K-SG0*LP3` and `SUN-*K-SG0*HP3`, for example SUN-12K-SG04LP3-EU, SUN-10K-SG01HP3-EU-AM2 | Experimental, reported working on a SUN-10K-SG05LP3-EU-SM2 and a SUN-10K-SG04LP3-EU |
 | String, micro, high voltage three phase, off grid | | Recognised, not mapped yet |
 
 Any regional or variant suffix (`-EU`, `-US`, `-AM2`, `-P` and so on) belongs to the
 same family as the base model.
 
 **Experimental** means the register map follows Deye's protocol documents and
-two independent open source implementations, and user reports confirm it, but it
+two independent open-source implementations, and user reports confirm it, but it
 has not been verified on hardware by this project yet.
 Low voltage models (LP3) get the same settings as single phase hybrids; high
-voltage models (HP3) are read only. A repair notice asks you to
+voltage models (HP3) are read only. A repair issue asks you to
 report anything that looks wrong.
 
 **Recognised, not mapped yet** means setup still succeeds and the device shows
@@ -153,8 +153,8 @@ Or search in HACS:
 1. In HACS, search for **Deye Local**.
 2. Install it and restart Home Assistant.
 3. Once the logger is in range of your adapter or proxy, Home Assistant shows it
-   under **Settings > Devices & Services** as discovered. Click **Configure**.
-   You can also add it manually: **Add Integration > Deye Local**, then pick the
+   under **Settings > Devices & services** as discovered. Click **Add**.
+   You can also add it manually: **Add integration > Deye Local**, then pick the
    logger from the list.
 
 Setup asks before connecting, then connects once, reads the inverter's family
@@ -163,7 +163,7 @@ the logger's Bluetooth link needs no pairing.
 
 ## Options
 
-Under **Settings > Devices & Services > Deye Local > Configure**:
+Under **Settings > Devices & services > Deye Local > Configure**:
 
 | Option | Default | Range |
 |--------|---------|-------|
@@ -175,7 +175,7 @@ in small blocks and disconnects again, so the logger keeps uploading to the Deye
 Cloud. Connecting is the slowest and least reliable part of a Bluetooth
 exchange, which is why the default interval is 30 seconds; an occasional poll
 that fails to connect is retried on the next one, and the last values are kept
-meanwhile.
+in the meantime.
 
 Turn **Keep the Bluetooth connection open** on if you do not use the Deye Cloud
 or the Deye app away from home. Polls then skip the reconnect and take about 2
@@ -202,7 +202,7 @@ Deye Single phase hybrid        inverter, grid, load, PV, battery totals, BMS
   discharge limits it asks for; signal strength of the Bluetooth link.
 - **Battery modules**: see below.
 
-The essentials are enabled by default. Per string voltages and currents,
+The essentials are enabled by default. Per-string voltages and currents,
 generator, output and CT details, the protocol version and the inverter clock
 are available but disabled, and so are the BMS values; enable any you need
 from the entity settings.
@@ -211,7 +211,7 @@ Power and current are signed: battery power and current are negative while the
 battery charges; grid power is positive while importing.
 
 At short intervals power values change on almost every poll. If your
-database grows more than you like, exclude the high frequency sensors you do not
+database grows more than you would like, exclude the fast-changing sensors you do not
 need from the recorder, or raise the poll interval.
 
 ## Settings
@@ -302,7 +302,7 @@ heading. Both can be set in the card editor.
 
 The integration adds the card to your dashboard resources (**Settings >
 Dashboards > ⋮ > Resources**), keeps it on the installed version and removes it
-with the last config entry. If your resources are managed in YAML, it loads the
+with the last Deye Local entry. If your resources are managed in YAML, it loads the
 card with Home Assistant's page instead: after installing or updating, reload
 the page, or close the Home Assistant app completely and open it again.
 
@@ -339,7 +339,7 @@ data:
 
 ## Battery card
 
-A battery that fills with the state of charge and shows how long it lasts, for
+A battery that fills to the state of charge and shows how long it lasts, for
 a dashboard you check at a glance. It loads with the integration, like the Time
 Of Use card.
 
@@ -359,7 +359,7 @@ left, the runtime becomes the headline and the battery a bar below it.
 - The fill is red below 20 %, amber below 50 % and green above; both levels
   are options.
 - The status shows charging or discharging and at what power, or idle when
-  less than 50 W flows either way. While power flows, stripes run toward the
+  less than 50 W flows either way. While power flows, stripes run towards the
   battery's tip when it charges and away from it when it discharges. With
   reduced motion turned on in your system, they stand still.
 - Marks under the battery show the limits the inverter works to: **Target**,
@@ -373,10 +373,10 @@ left, the runtime becomes the headline and the battery a bar below it.
 |---|---|
 | charging from the grid in a time of use slot, below the slot's SOC | **80% in ~50 min**, until it reaches the slot's SOC |
 | charging otherwise, from solar for example | **Full in ~1 h 20 min** |
-| discharging while the grid is up | **80% in ~1 h 5 min**, until it reaches the slot's SOC, where the inverter takes over from the grid |
+| discharging while the grid is up | **80% in ~1 h 5 min**, until it reaches the slot's SOC, where the inverter switches to the grid |
 | discharging during an outage | **Lasts ~7 h 40 min**, until the Battery shutdown SOC |
 
-The card tells the grid is down from the inverter's **Grid frequency**, which
+The card detects an outage from the inverter's **Grid frequency**, which
 drops to 0 without a grid.
 
 Tap the card for the SOC sensor's details and history.
@@ -423,7 +423,7 @@ drifting apart.
 
 If your inverter is experimental or not mapped yet:
 
-1. Open the device under **Settings > Devices & Services > Deye Local** and
+1. Open the device under **Settings > Devices & services > Deye Local** and
    choose **Download diagnostics**. The file includes a dump of the inverter's
    data registers, read over the same Bluetooth link. Serial numbers and
    Bluetooth addresses are removed from it, so it is safe to attach publicly.
@@ -438,17 +438,17 @@ inverter through Deye's official cloud API. The two run side by side as long as
 Deye Local releases the logger between polls (the default): the logger serves
 this integration over Bluetooth and keeps uploading to the cloud over Wi-Fi.
 With the connection kept open, the cloud's inverter values stop updating. The cloud remains useful for access away from
-home, for station level figures the cloud computes, and for daily totals that
+home, for station-level figures the cloud computes, and for daily totals that
 survive an inverter restart (the inverter resets its own daily counters when it
 powers up).
 
 ## Credits
 
-- The Bluetooth protocol facts (command channel, `AT+INVDATA` framing, the single
-  connection limit and the logger's read cache) were first documented by
+- The Bluetooth protocol facts (command channel, `AT+INVDATA` framing, the single-connection
+  limit and the logger's read cache) were first documented by
   [hacky-swan/deye-bluetooth](https://github.com/hacky-swan/deye-bluetooth).
 - Register addresses and scaling follow Deye's Modbus protocol documents, as
-  collected and field tested in the inverter definitions of
+  collected and field-tested in the inverter definitions of
   [davidrapan/ha-solarman](https://github.com/davidrapan/ha-solarman) (MIT).
   The three phase map was cross-checked against
   [kbialek/deye-inverter-mqtt](https://github.com/kbialek/deye-inverter-mqtt)
@@ -460,7 +460,7 @@ either project.
 
 ## Removing the integration
 
-1. Go to **Settings > Devices & Services**, open **Deye Local**, and use the
+1. Go to **Settings > Devices & services**, open **Deye Local**, and use the
    three-dot menu on the entry to **Delete** it. That releases the logger's
    Bluetooth connection and removes the device and its entities.
 2. In HACS, open **Deye Local** and choose **Remove** to delete the files.
@@ -484,8 +484,8 @@ for a particular purpose and non-infringement. See the [LICENSE](LICENSE).
   remove it with any firmware update, and using it may affect your warranty.
 - Inverters and batteries operate at dangerous voltages and currents. Nothing in
   this project replaces the manufacturer's documentation, a qualified installer,
-  or the protections built into your equipment. Do not rely on it for safety
-  critical decisions.
+  or the protections built into your equipment. Do not rely on it for
+  safety-critical decisions.
 - Settings you change through it are written to the inverter as you set them.
   Wrong values can drain or damage batteries or cut power to your loads; check
   them against your equipment's documentation first.

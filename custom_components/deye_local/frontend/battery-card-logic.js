@@ -21,7 +21,7 @@ export function clockMinutes(value) {
   return match ? Number(match[1]) * 60 + Number(match[2]) : null;
 }
 
-// Whole hours and minutes in 5 minute steps; past 10 hours the minutes are noise,
+// Whole hours and minutes in 5-minute steps; past 10 hours the minutes are noise,
 // and past two days so are the hours.
 export function durationParts(hours) {
   const minutes = Math.max(5, Math.round((hours * 60) / 5) * 5);
@@ -78,7 +78,7 @@ export function target({ mode, soc, slot, shutdown, gridHz }) {
 }
 
 // Rough, like the inverter app's: linear in SOC, at the present voltage and power.
-// Returns the headline label, the duration parts and the one line text, or null.
+// Returns the headline label, the duration parts and the one-line text, or null.
 export function runtime({ mode, soc, power, capacity, voltage, slot, shutdown, gridHz }) {
   if (mode !== "charging" && mode !== "discharging") return null;
   if (!capacity || !voltage || !power) return null;
