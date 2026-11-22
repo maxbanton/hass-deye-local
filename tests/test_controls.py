@@ -249,6 +249,24 @@ async def test_three_phase_power_is_bounded_by_its_rated_power(hass: HomeAssista
     assert hass.states.get(entity_id).attributes["max"] == 10000
 
 
+async def test_three_phase_solar_sell_and_max_solar_power(hass: HomeAssistant) -> None:
+    from .snapshot import SETTINGS
+
+    three = "deye_three_phase_hybrid"
+    sell, solar = f"switch.{three}_solar_sell", f"number.{three}_max_solar_power"
+    # A 10 kW unit that holds 11000 W, as the Deye app showed on one.
+    with patch.dict(SETTINGS, {0x0014: 34464, 0x0015: 1, 0x0091: 0, 0x0154: 11000}):
+        await _setup(hass, device_type=5)
+    assert hass.states.get(sell).state == "off"
+    assert hass.states.get(solar).state == "11000"
+    fake = transport()
+    await _call(hass, "switch", "turn_on", sell)
+    await _call(hass, "number", "set_value", solar, value=12000)
+    assert fake.writes == [(0x0091, [1]), (0x0154, [12000])]
+    assert hass.states.get(sell).state == "on"
+    assert hass.states.get(solar).state == "12000"
+
+
 async def test_switch_off_clears_only_its_bit(hass: HomeAssistant) -> None:
     await _setup(hass)
     await _call(hass, "switch", "turn_off", TIME_OF_USE)

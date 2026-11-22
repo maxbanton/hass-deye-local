@@ -278,6 +278,14 @@ def hertz(key, name, reg, **kw) -> RegisterSensor:
                           device_class=F, precision=2, **kw)
 
 
+def phases(make, key: str, name: str, first: int, **kw) -> tuple[RegisterSensor, ...]:
+    """One sensor per phase, from three consecutive registers."""
+    return tuple(
+        make(key.format(n), name.format(n), first + n - 1, **kw)
+        for n in (1, 2, 3)
+    )
+
+
 def status(state: int, alarm: tuple[int, ...], fault: tuple[int, ...],
            clock: tuple[int, ...]) -> tuple[RegisterSensor, ...]:
     return (
@@ -617,12 +625,24 @@ THREE_PHASE_OVERRIDES: dict[str, dict[str, Any]] = {
 }
 
 
+# Settings the single phase map does not have, at their own addresses. Max solar
+# power goes above the rated power (11000 W on a 10 kW unit, whose PV input takes
+# up to 13000 W), so it is bounded by the range ha-solarman uses for these models.
+THREE_PHASE_EXTRA_CONTROLS = (
+    Control(key="solar_sell", name="Solar sell", register=0x0091,
+            platform=ControlPlatform.SWITCH),
+    Control(key="max_solar_power", name="Max solar power", register=0x0154,
+            platform=ControlPlatform.NUMBER, maximum=32000, step=10, unit=W,
+            device_class="power"),
+)
+
+
 def three_phase_controls() -> tuple[Control, ...]:
     return tuple(
         replace(c, register=c.register - THREE_PHASE_OFFSET,
                 **THREE_PHASE_OVERRIDES.get(c.key, {}))
         for c in SINGLE_PHASE.controls
-    )
+    ) + THREE_PHASE_EXTRA_CONTROLS
 
 
 # SUN-*K-SG0*LP3, SUN-*K-SG0*HP3
@@ -646,6 +666,12 @@ THREE_PHASE = Family(
         volts("grid_l1_voltage", "Grid L1 voltage", 0x0256),
         volts("grid_l2_voltage", "Grid L2 voltage", 0x0257),
         volts("grid_l3_voltage", "Grid L3 voltage", 0x0258),
+        # Measured at the inverter's grid port, not at the meter: it is the grid
+        # current the Deye Cloud shows, and reads several amps while grid power is
+        # near 0 W.
+        *phases(amps, "inverter_grid_port_l{}_current", "Inverter grid port L{} current",
+                0x0262),
+        *phases(amps, "external_ct_l{}_current", "External CT L{} current", 0x0265),
         hertz("grid_frequency", "Grid frequency", 0x0261),
         power("grid_power", "Grid power", 0x0271, 0x02B2, kind=Kind.S32_LOW_SIGNED),
         power("grid_l1_power", "Grid L1 power", 0x026E, 0x02AF, kind=Kind.S32_LOW_SIGNED,
@@ -656,9 +682,16 @@ THREE_PHASE = Family(
               enabled=False),
         power("external_ct_power", "External CT power", 0x026B, 0x02C4, kind=Kind.S32,
               enabled=False),
+        *phases(power, "external_ct_l{}_power", "External CT L{} power", 0x0268),
         power("inverter_power", "Inverter power", 0x027C, 0x02B6, kind=Kind.S32),
+        *phases(volts, "inverter_l{}_voltage", "Inverter L{} voltage", 0x0273),
+        *phases(amps, "inverter_l{}_current", "Inverter L{} current", 0x0276),
+        *phases(power, "inverter_l{}_power", "Inverter L{} power", 0x0279),
         power("ups_power", "UPS power", 0x0283, 0x02BB, kind=Kind.S32),
+        *phases(power, "ups_l{}_power", "UPS L{} power", 0x0280),
         power("load_power", "Load power", 0x028D, 0x0293, kind=Kind.S32),
+        *phases(volts, "load_l{}_voltage", "Load L{} voltage", 0x0284),
+        *phases(power, "load_l{}_power", "Load L{} power", 0x028A),
         hertz("load_frequency", "Load frequency", 0x028F, enabled=False),
         power("pv1_power", "PV1 power", 0x02A0, kind=Kind.U16),
         power("pv2_power", "PV2 power", 0x02A1, kind=Kind.U16),

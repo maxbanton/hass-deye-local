@@ -110,7 +110,7 @@ def test_low_voltage_three_phase_has_the_single_phase_settings_lower():
     low_voltage, high_voltage = family_for(0x0005), family_for(0x0006)
     single = {c.key: c for c in SINGLE_PHASE.controls}
     three = {c.key: c for c in low_voltage.controls}
-    assert three.keys() == single.keys()
+    assert three.keys() == single.keys() | {"solar_sell", "max_solar_power"}
     assert all(three[k].register == single[k].register - 0x66 for k in single)
     assert three["time_of_use"].register == 0x0092
     assert three["tou1_soc"].register == 0x00A6
@@ -121,6 +121,49 @@ def test_low_voltage_three_phase_has_the_single_phase_settings_lower():
     assert high_voltage.controls == ()
     assert high_voltage.key == low_voltage.key
     assert high_voltage.sensors == low_voltage.sensors
+    assert three["solar_sell"].register == 0x0091
+    assert three["max_solar_power"].register == 0x0154
+
+
+# Read from a SUN-10K-SG04LP3-EU on 2026-11-18, a minute apart from the Deye
+# Cloud values in the comments.
+THREE_PHASE_PER_PHASE = {
+    0x0262: 73, 0x0263: 106, 0x0264: 535, 0x0265: 93, 0x0266: 111, 0x0267: 166,
+    0x0268: 4, 0x0269: 3, 0x026A: 5, 0x026B: 12, 0x02C4: 0,
+    0x0273: 2349, 0x0274: 2337, 0x0275: 2346,
+    0x0276: 50, 0x0277: 90, 0x0278: 530,
+    0x0279: 157, 0x027A: 243, 0x027B: 1264, 0x027C: 1664, 0x02B6: 0,
+    0x0280: 14, 0x0281: 17, 0x0282: 24, 0x0283: 55, 0x02BB: 0,
+    0x0284: 2335, 0x0285: 2340, 0x0286: 2332,
+    0x028A: 161, 0x028B: 243, 0x028C: 1265, 0x028D: 1669, 0x0293: 0,
+}
+
+
+def test_three_phase_per_phase_readings():
+    values = {
+        s.key: decode(s, THREE_PHASE_PER_PHASE)
+        for s in THREE_PHASE.sensors
+        if all(r in THREE_PHASE_PER_PHASE for r in s.registers)
+    }
+    # Cloud: grid 0.74 A, inverter 235.1 V 0.50 A 161 W, UPS 233.5 V, CT 2 W.
+    assert [values[f"inverter_grid_port_l{n}_current"] for n in (1, 2, 3)] == [0.73, 1.06, 5.35]
+    assert [values[f"external_ct_l{n}_current"] for n in (1, 2, 3)] == [0.93, 1.11, 1.66]
+    assert [values[f"inverter_l{n}_voltage"] for n in (1, 2, 3)] == [234.9, 233.7, 234.6]
+    assert [values[f"inverter_l{n}_current"] for n in (1, 2, 3)] == [0.5, 0.9, 5.3]
+    assert [values[f"load_l{n}_voltage"] for n in (1, 2, 3)] == [233.5, 234.0, 233.2]
+    for part in ("external_ct", "inverter", "ups", "load"):
+        phases = [values[f"{part}_l{n}_power"] for n in (1, 2, 3)]
+        assert sum(phases) == values[f"{part}_power"], part
+
+
+def test_three_phase_per_phase_sensors_are_enabled_by_default():
+    parts = ("inverter_grid_port_l{}_current", "external_ct_l{}_current", "external_ct_l{}_power",
+             "inverter_l{}_voltage", "inverter_l{}_current", "inverter_l{}_power",
+             "ups_l{}_power", "load_l{}_voltage", "load_l{}_power")
+    keys = {part.format(n) for part in parts for n in (1, 2, 3)}
+    sensors = {s.key: s for s in THREE_PHASE.sensors}
+    assert keys <= sensors.keys()
+    assert all(sensors[key].enabled for key in keys)
 
 
 @pytest.mark.parametrize(

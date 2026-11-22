@@ -51,8 +51,9 @@ than a Bluetooth adapter or an ESPHome Bluetooth proxy in range.
   discharge current, grid charge current, shutdown, restart and low SOC, energy
   pattern, work mode, grid charging, the six time of use slots, max sell and
   zero export power, and grid peak shaving. Low voltage three phase hybrids get
-  the same settings (experimental). Every change is read back
-  from the inverter and reported as an error if it did not stick.
+  the same settings plus solar sell and max solar power (experimental). Every
+  change is read back from the inverter and reported as an error if it did not
+  stick.
 - Two dashboard cards: a Time Of Use editor laid out like the inverter's
   screen, and a battery that fills to the state of charge and shows how long
   it lasts at the present power.
@@ -199,13 +200,18 @@ Deye Single phase hybrid        inverter, grid, load, PV, battery totals, BMS
   power and temperature for the whole bank; grid voltage, frequency and power;
   inverter and load power; PV power per string; inverter temperatures; battery,
   grid, load and PV energy counters; the BMS values and the charge and
-  discharge limits it asks for; signal strength of the Bluetooth link.
+  discharge limits it asks for; signal strength of the Bluetooth link. Three
+  phase hybrids add per-phase readings: inverter voltage, current and power,
+  UPS power, load voltage and power, CT current and power, and the current at
+  the inverter's grid port. The grid port current is what the Deye app shows as
+  grid current; it is measured inside the inverter, not at the meter, so it can
+  read several amps while grid power is near 0 W.
 - **Battery modules**: see below.
 
 The essentials are enabled by default. Per-string voltages and currents,
 generator, output and CT details, the protocol version and the inverter clock
-are available but disabled, and so are the BMS values; enable any you need
-from the entity settings.
+are available but disabled, and so are the BMS values;
+enable any you need from the entity settings.
 
 Power and current are signed: battery power and current are negative while the
 battery charges; grid power is positive while importing.
@@ -229,8 +235,9 @@ Single phase hybrids get these controls on the inverter device:
 | TOU slot power, voltage, grid charge and generator charge; Generator charge; Grid charge start SOC | disabled, under Configuration |
 
 Low voltage three phase hybrids (LP3, experimental) get the same controls with
-the same defaults. Their battery currents go up to 350 A, and slot and sell power
-are not limited to a rated power yet.
+the same defaults, with battery currents up to 350 A. They also get **Solar
+sell** and **Max solar power**, enabled, under Configuration. Max solar power
+can be set above the rated power, as in the Deye app.
 
 The two charge currents are separate settings on the inverter's screen:
 **Battery max charge current** is "Max A Charge" on the first battery setting
@@ -250,10 +257,11 @@ How changes work:
 - After writing, the value is read back until it shows up (the logger may answer
   from its cache for a few seconds). If the inverter does not keep it, the change
   fails with an error in Home Assistant instead of pretending to succeed.
-- Limits are only the obvious ones: SOC 0 to 100 %, currents up to 240 A (350 A on three phase), slot
-  and sell power up to the rated power the inverter reports, and slot start times in
-  ascending order (each slot runs until the next one starts). Everything else is
-  up to the inverter, which rejects what your model or battery does not allow.
+- Limits are only the obvious ones: SOC 0 to 100 %, currents up to 240 A (350 A
+  on three phase), slot and sell power up to the rated power the inverter
+  reports, max solar power up to 32000 W, and slot start times in ascending
+  order (each slot runs until the next one starts). Everything else is up to the
+  inverter, which rejects what your model or battery does not allow.
 
 Change settings with care: they control how the inverter charges and discharges
 the battery and uses the grid.
