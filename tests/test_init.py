@@ -179,11 +179,20 @@ async def test_values_go_unavailable_after_the_stale_timeout(hass: HomeAssistant
     assert hass.states.get(SOC).state == STATE_UNAVAILABLE
 
 
-async def test_experimental_family_raises_a_repair_issue(hass: HomeAssistant) -> None:
-    entry = await _setup(hass, device_type=0x0005)
-    issue = ir.async_get(hass).async_get_issue(DOMAIN, f"model_{entry.entry_id}")
-    assert issue is not None
-    assert issue.translation_key == "experimental"
+@pytest.mark.parametrize("device_type", [0x0005, 0x0006])
+async def test_mapped_families_raise_no_repair_issue(
+    hass: HomeAssistant, device_type: int
+) -> None:
+    entry = await _setup(hass, device_type=device_type)
+    issue_id = f"model_{entry.entry_id}"
+    assert ir.async_get(hass).async_get_issue(DOMAIN, issue_id) is None
+    # One left by an earlier version goes away on the next start.
+    await hass.config_entries.async_unload(entry.entry_id)
+    ir.async_create_issue(hass, DOMAIN, issue_id, is_fixable=False,
+                          severity=ir.IssueSeverity.WARNING, translation_key="experimental")
+    await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    assert ir.async_get(hass).async_get_issue(DOMAIN, issue_id) is None
 
 
 async def test_unsupported_family_exposes_identity_only(hass: HomeAssistant) -> None:
@@ -431,7 +440,7 @@ async def test_changed_options_apply_at_once(hass: HomeAssistant) -> None:
 
 
 async def test_removing_the_entry_clears_its_issue(hass: HomeAssistant) -> None:
-    entry = await _setup(hass, device_type=5)
+    entry = await _setup(hass, device_type=0x0004)
     issues = ir.async_get(hass)
     assert issues.async_get_issue(DOMAIN, f"model_{entry.entry_id}") is not None
     await hass.config_entries.async_remove(entry.entry_id)

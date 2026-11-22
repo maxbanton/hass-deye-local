@@ -121,6 +121,7 @@ def test_low_voltage_three_phase_has_the_single_phase_settings_lower():
     assert high_voltage.controls == ()
     assert high_voltage.key == low_voltage.key
     assert high_voltage.sensors == low_voltage.sensors
+    assert all(c.enabled for c in low_voltage.controls)
     assert three["solar_sell"].register == 0x0091
     assert three["max_solar_power"].register == 0x0154
 
@@ -171,7 +172,7 @@ def test_three_phase_per_phase_sensors_are_enabled_by_default():
     [
         (0x0003, "single_phase_hybrid", Support.SUPPORTED),
         (0x0300, "single_phase_hybrid", Support.SUPPORTED),
-        (0x0005, "three_phase_hybrid", Support.EXPERIMENTAL),
+        (0x0005, "three_phase_hybrid", Support.SUPPORTED),
         (0x0006, "three_phase_hybrid", Support.EXPERIMENTAL),
         (0x0002, "unsupported", Support.UNSUPPORTED),
         (0x1234, "unsupported", Support.UNSUPPORTED),

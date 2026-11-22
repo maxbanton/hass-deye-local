@@ -267,6 +267,29 @@ async def test_three_phase_solar_sell_and_max_solar_power(hass: HomeAssistant) -
     assert hass.states.get(solar).state == "12000"
 
 
+async def test_controls_enabled_by_default_are_enabled_on_update(
+    hass: HomeAssistant,
+) -> None:
+    from homeassistant.helpers import entity_registry as er
+
+    from custom_components.deye_local.const import DOMAIN
+
+    registry = er.async_get(hass)
+    entry = await _setup(hass, device_type=5)
+    serial = entry.data["serial"]
+    await hass.config_entries.async_unload(entry.entry_id)
+    sell = registry.async_get_entity_id("number", DOMAIN, f"{serial}_max_sell_power")
+    shaving = registry.async_get_entity_id("switch", DOMAIN, f"{serial}_grid_peak_shaving")
+    # As an older version left them: one off by default, one off by the user.
+    registry.async_update_entity(sell, disabled_by=er.RegistryEntryDisabler.INTEGRATION)
+    registry.async_update_entity(shaving, disabled_by=er.RegistryEntryDisabler.USER)
+    await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    assert registry.async_get(sell).disabled_by is None
+    assert hass.states.get(sell) is not None
+    assert registry.async_get(shaving).disabled_by is er.RegistryEntryDisabler.USER
+
+
 async def test_switch_off_clears_only_its_bit(hass: HomeAssistant) -> None:
     await _setup(hass)
     await _call(hass, "switch", "turn_off", TIME_OF_USE)

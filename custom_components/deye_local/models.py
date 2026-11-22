@@ -638,8 +638,9 @@ THREE_PHASE_EXTRA_CONTROLS = (
 
 
 def three_phase_controls() -> tuple[Control, ...]:
+    """The single phase controls at their three phase addresses, all enabled."""
     return tuple(
-        replace(c, register=c.register - THREE_PHASE_OFFSET,
+        replace(c, register=c.register - THREE_PHASE_OFFSET, enabled=True,
                 **THREE_PHASE_OVERRIDES.get(c.key, {}))
         for c in SINGLE_PHASE.controls
     ) + THREE_PHASE_EXTRA_CONTROLS
@@ -650,7 +651,7 @@ THREE_PHASE = Family(
     key="three_phase_hybrid",
     name="Three phase hybrid",
     codes=frozenset({0x0005, 0x0500}),
-    support=Support.EXPERIMENTAL,
+    support=Support.SUPPORTED,
     has_battery_modules=True,
     sensors=(
         *IDENTITY,
@@ -724,7 +725,7 @@ THREE_PHASE = Family(
 # High voltage models scale the time of use power (x10) and voltage (x0.1)
 # differently, so they stay read only until one confirms the map.
 THREE_PHASE_HV = replace(THREE_PHASE, codes=frozenset({0x0006}), controls=(),
-                         rated_power=())
+                         rated_power=(), support=Support.EXPERIMENTAL)
 
 
 KNOWN_UNSUPPORTED = {

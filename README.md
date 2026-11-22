@@ -51,9 +51,8 @@ than a Bluetooth adapter or an ESPHome Bluetooth proxy in range.
   discharge current, grid charge current, shutdown, restart and low SOC, energy
   pattern, work mode, grid charging, the six time of use slots, max sell and
   zero export power, and grid peak shaving. Low voltage three phase hybrids get
-  the same settings plus solar sell and max solar power (experimental). Every
-  change is read back from the inverter and reported as an error if it did not
-  stick.
+  the same settings plus solar sell and max solar power. Every change is read
+  back from the inverter and reported as an error if it did not stick.
 - Two dashboard cards: a Time Of Use editor laid out like the inverter's
   screen, and a battery that fills to the state of charge and shows how long
   it lasts at the present power.
@@ -128,18 +127,17 @@ picks the matching register map.
 | Family | Models | Status |
 |--------|--------|--------|
 | Single phase hybrid | `SUN-*K-SG0*LP1`, for example SUN-3.6K-SG03LP1-EU, SUN-6K-SG05LP1-EU, SUN-8K-SG01LP1-EU | Supported, verified on a SUN-6K-SG05LP1-EU-AM2-P, reported working on a SUN-10K-SG02LP1-EU-AM3 |
-| Three phase hybrid, low and high voltage | `SUN-*K-SG0*LP3` and `SUN-*K-SG0*HP3`, for example SUN-12K-SG04LP3-EU, SUN-10K-SG01HP3-EU-AM2 | Experimental, reported working on a SUN-10K-SG05LP3-EU-SM2 and a SUN-10K-SG04LP3-EU |
+| Three phase hybrid, low voltage | `SUN-*K-SG0*LP3`, for example SUN-12K-SG04LP3-EU | Supported, reported working on a SUN-10K-SG05LP3-EU-SM2 and a SUN-10K-SG04LP3-EU |
+| Three phase hybrid, high voltage | `SUN-*K-SG0*HP3`, for example SUN-10K-SG01HP3-EU-AM2 | Experimental, read only |
 | String, micro, high voltage three phase, off grid | | Recognised, not mapped yet |
 
 Any regional or variant suffix (`-EU`, `-US`, `-AM2`, `-P` and so on) belongs to the
 same family as the base model.
 
 **Experimental** means the register map follows Deye's protocol documents and
-two independent open-source implementations, and user reports confirm it, but it
-has not been verified on hardware by this project yet.
-Low voltage models (LP3) get the same settings as single phase hybrids; high
-voltage models (HP3) are read only. A repair issue asks you to
-report anything that looks wrong.
+two independent open-source implementations, but nobody has confirmed it on
+their inverter yet, so high voltage models (HP3) are read only. If you have
+one, a diagnostics download helps (see below).
 
 **Recognised, not mapped yet** means setup still succeeds and the device shows
 its type and identity, so you can download the diagnostics and help add it (see
@@ -234,10 +232,10 @@ Single phase hybrids get these controls on the inverter device:
 | Max sell power, Zero export power, Grid peak shaving and its power | disabled, under Configuration |
 | TOU slot power, voltage, grid charge and generator charge; Generator charge; Grid charge start SOC | disabled, under Configuration |
 
-Low voltage three phase hybrids (LP3, experimental) get the same controls with
-the same defaults, with battery currents up to 350 A. They also get **Solar
-sell** and **Max solar power**, enabled, under Configuration. Max solar power
-can be set above the rated power, as in the Deye app.
+Low voltage three phase hybrids (LP3) get the same controls, all
+enabled, with battery currents up to 350 A. They also get **Solar sell** and
+**Max solar power** under Configuration. Max solar power can be set above the
+rated power, as in the Deye app.
 
 The two charge currents are separate settings on the inverter's screen:
 **Battery max charge current** is "Max A Charge" on the first battery setting
