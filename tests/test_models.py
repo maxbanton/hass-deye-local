@@ -120,7 +120,9 @@ def test_low_voltage_three_phase_has_the_single_phase_settings_lower():
     assert three["grid_charge_current"].maximum == 350
     assert high_voltage.controls == ()
     assert high_voltage.key == low_voltage.key
-    assert high_voltage.sensors == low_voltage.sensors
+    assert {s.key for s in high_voltage.sensors} == {s.key for s in low_voltage.sensors} - {
+        "rated_power"
+    }
     assert all(c.enabled for c in low_voltage.controls)
     assert three["solar_sell"].register == 0x0091
     assert three["max_solar_power"].register == 0x0154
@@ -290,3 +292,43 @@ def test_pv_strings_follow_the_mppt_count():
     assert not has_string(SINGLE_PHASE, SENSORS["pv4_power"], SNAPSHOT_10K)
     assert has_string(SINGLE_PHASE, SENSORS["pv1_power"], {})
     assert decode(SENSORS["pv3_voltage"], SNAPSHOT_10K) == pytest.approx(3.8)
+
+
+# Read from the same SUN-10K-SG04LP3-EU, and from a SUN-12K-SG05LP3-EU, whose
+# Deye Cloud pages showed 10 kW and 12 kW.
+THREE_PHASE_10K = {
+    0x0014: 34464, 0x0015: 1, 0x026D: 65476, 0x0200: 9, 0x0201: 0,
+    0x0218: 0, 0x0219: 0, 0x021A: 0, 0x021B: 0, 0x0228: 5, 0x029B: 0, 0x029F: 0,
+}
+THREE_PHASE_12K = {0x0014: 54464, 0x0015: 1, 0x026D: 998, 0x0228: 5}
+
+
+def test_three_phase_status_readings():
+    values = {
+        s.key: decode(s, THREE_PHASE_10K)
+        for s in THREE_PHASE.sensors
+        if all(r in THREE_PHASE_10K for r in s.registers)
+    }
+    assert values["rated_power"] == 10000
+    assert values["grid_power_factor"] == -6.0
+    assert values["total_generator_runtime"] == 0.9
+    assert values["today_generator_runtime"] == 0
+    assert values["generator_power"] == 0
+    sensors = {s.key: s for s in THREE_PHASE.sensors}
+    assert decode(sensors["rated_power"], THREE_PHASE_12K) == 12000
+    assert decode(sensors["grid_power_factor"], THREE_PHASE_12K) == 99.8
+
+
+def test_fixed_values_are_read_with_the_settings():
+    fixed = {r for s in THREE_PHASE.sensors if s.setting for r in s.registers}
+    assert fixed == {0x0014, 0x0015}
+    assert fixed <= THREE_PHASE.setting_registers
+    assert not fixed & THREE_PHASE.registers
+    assert 0x0228 in THREE_PHASE.registers
+
+
+def test_single_phase_rated_power():
+    from .snapshot import SETTINGS
+
+    rated = next(s for s in SINGLE_PHASE.sensors if s.key == "rated_power")
+    assert decode(rated, SETTINGS) == 6000

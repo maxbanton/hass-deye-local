@@ -198,17 +198,18 @@ Deye Single phase hybrid        inverter, grid, load, PV, battery totals, BMS
   power and temperature for the whole bank; grid voltage, frequency and power;
   inverter and load power; PV power per string; inverter temperatures; battery,
   grid, load and PV energy counters; the BMS values and the charge and
-  discharge limits it asks for; signal strength of the Bluetooth link. Three
-  phase hybrids add per-phase readings: inverter voltage, current and power,
-  UPS power, load voltage and power, CT current and power, and the current at
-  the inverter's grid port. The grid port current is what the Deye app shows as
-  grid current; it is measured inside the inverter, not at the meter, so it can
-  read several amps while grid power is near 0 W.
+  discharge limits it asks for; whether the grid relay is closed; the rated
+  power; signal strength of the Bluetooth link. Three phase hybrids add per-phase readings: inverter voltage,
+  current and power, UPS power, load voltage and power, CT current and power,
+  and the current at the inverter's grid port. The grid port current is what
+  the Deye app shows as grid current; it is measured inside the inverter, not
+  at the meter, so it can read several amps while grid power is near 0 W. They
+  also show the grid power factor and generator power, energy and runtime.
 - **Battery modules**: see below.
 
 The essentials are enabled by default. Per-string voltages and currents,
-generator, output and CT details, the protocol version and the inverter clock
-are available but disabled, and so are the BMS values;
+generator, output and CT details, the grid power factor, the protocol version
+and the inverter clock are available but disabled, and so are the BMS values;
 enable any you need from the entity settings.
 
 Power and current are signed: battery power and current are negative while the

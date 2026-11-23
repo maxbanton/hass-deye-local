@@ -24,7 +24,7 @@ from custom_components.deye_local.const import (
 from custom_components.deye_local.models import Coarse
 
 from .common import ADDRESS, FakeTransport, service_info
-from .snapshot import BATTERIES, SNAPSHOT_10K
+from .snapshot import BATTERIES, SNAPSHOT, SNAPSHOT_10K
 
 BATTERY_1 = "25007000E4020510"
 BATTERY_2 = "25007000E1260830"
@@ -501,3 +501,35 @@ async def test_pv3_is_left_out_on_two_string_units(hass: HomeAssistant) -> None:
     await _setup(hass)
     assert hass.states.get("sensor.deye_single_phase_hybrid_pv2_power") is not None
     assert hass.states.get("sensor.deye_single_phase_hybrid_pv3_power") is None
+
+
+async def test_three_phase_grid_relay_and_rated_power(hass: HomeAssistant) -> None:
+    from .snapshot import SETTINGS
+
+    with (
+        patch.dict(SETTINGS, {0x0014: 54464, 0x0015: 1}),
+        patch.dict(SNAPSHOT, {0x0228: 5}),
+    ):
+        entry = await _setup(hass, device_type=5)
+    three = "deye_three_phase_hybrid"
+    assert hass.states.get(f"binary_sensor.{three}_grid_relay").state == "on"
+    assert hass.states.get(f"sensor.{three}_rated_power").state == "12000.0"
+    coordinator = entry.runtime_data
+    coordinator.async_set_updated_data({**coordinator.data, 0x0228: 1})
+    await hass.async_block_till_done()
+    assert hass.states.get(f"binary_sensor.{three}_grid_relay").state == "off"
+    coordinator.async_set_updated_data({})
+    await hass.async_block_till_done()
+    assert hass.states.get(f"binary_sensor.{three}_grid_relay").state == STATE_UNAVAILABLE
+
+
+async def test_single_phase_grid_relay_and_rated_power(hass: HomeAssistant) -> None:
+    entry = await _setup(hass)
+    one = "deye_single_phase_hybrid"
+    assert hass.states.get(f"binary_sensor.{one}_grid_relay").state == "on"
+    assert hass.states.get(f"sensor.{one}_rated_power").state == "6000.0"
+    # Read during a grid outage on the same inverter.
+    coordinator = entry.runtime_data
+    coordinator.async_set_updated_data({**coordinator.data, 0x00C2: 0})
+    await hass.async_block_till_done()
+    assert hass.states.get(f"binary_sensor.{one}_grid_relay").state == "off"

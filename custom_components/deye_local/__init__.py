@@ -33,6 +33,7 @@ from .models import Support, family_for
 from .services import async_setup_services
 
 PLATFORMS = [
+    Platform.BINARY_SENSOR,
     Platform.NUMBER,
     Platform.SELECT,
     Platform.SENSOR,

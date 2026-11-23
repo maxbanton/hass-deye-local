@@ -43,6 +43,15 @@
     }
   },
   "entity": {
+    "binary_sensor": {
+      "grid_relay": {
+        "name": "Grid relay",
+        "state": {
+          "off": "Open",
+          "on": "Closed"
+        }
+      }
+    },
     "number": {
       "grid_charge_current": {
         "name": "Grid charge current"
@@ -235,6 +244,9 @@
       "grid_power": {
         "name": "Grid power"
       },
+      "grid_power_factor": {
+        "name": "Grid power factor"
+      },
       "grid_voltage": {
         "name": "Grid voltage"
       },
@@ -367,6 +379,9 @@
       "pv4_voltage": {
         "name": "PV4 voltage"
       },
+      "rated_power": {
+        "name": "Rated power"
+      },
       "signal_strength": {
         "name": "Signal strength"
       },
@@ -385,6 +400,12 @@
       "today_battery_discharge": {
         "name": "Today battery discharge"
       },
+      "today_generator_production": {
+        "name": "Today generator production"
+      },
+      "today_generator_runtime": {
+        "name": "Today generator runtime"
+      },
       "today_grid_export": {
         "name": "Today grid export"
       },
@@ -402,6 +423,12 @@
       },
       "total_battery_discharge": {
         "name": "Total battery discharge"
+      },
+      "total_generator_production": {
+        "name": "Total generator production"
+      },
+      "total_generator_runtime": {
+        "name": "Total generator runtime"
       },
       "total_grid_export": {
         "name": "Total grid export"

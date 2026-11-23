@@ -20,6 +20,7 @@ from homeassistant.const import (
     UnitOfFrequency,
     UnitOfPower,
     UnitOfTemperature,
+    UnitOfTime,
 )
 
 REG_DEVICE_TYPE = 0x0000
@@ -101,6 +102,19 @@ class RegisterSensor:
     coarse: Coarse | None = None
     # PV string the sensor belongs to, when the unit may not have it.
     string: int | None = None
+    # Fixed values, read with the settings instead of on every poll.
+    setting: bool = False
+
+
+@dataclass(frozen=True, kw_only=True)
+class RegisterFlag:
+    """One bit of a status register, shown as a binary sensor."""
+
+    key: str
+    name: str
+    register: int
+    bit: int
+    enabled: bool = True
 
 
 class ControlPlatform(StrEnum):
@@ -146,6 +160,7 @@ class Family:
     codes: frozenset[int]
     support: Support
     sensors: tuple[RegisterSensor, ...] = field(default=())
+    flags: tuple[RegisterFlag, ...] = field(default=())
     has_battery_modules: bool = False
     controls: tuple[Control, ...] = field(default=())
     rated_power: tuple[int, ...] = field(default=())
@@ -159,12 +174,18 @@ class Family:
 
     @property
     def registers(self) -> set[int]:
-        return {reg for sensor in self.sensors for reg in sensor.registers}
+        return {
+            reg for sensor in self.sensors if not sensor.setting for reg in sensor.registers
+        } | {flag.register for flag in self.flags}
 
     @property
     def setting_registers(self) -> set[int]:
         mppt = {self.mppt_register} if self.mppt_register is not None else set()
-        return {control.register for control in self.controls} | set(self.rated_power) | mppt
+        fixed = {reg for sensor in self.sensors if sensor.setting for reg in sensor.registers}
+        return (
+            {control.register for control in self.controls}
+            | set(self.rated_power) | mppt | fixed
+        )
 
 
 def _words(regs: dict[int, int], addresses: tuple[int, ...]) -> int:
@@ -250,6 +271,19 @@ TOTAL = SensorStateClass.TOTAL_INCREASING
 def power(key, name, *regs, kind=Kind.S16, **kw) -> RegisterSensor:
     return RegisterSensor(key=key, name=name, registers=regs, kind=kind, unit=W,
                           device_class=P, **kw)
+
+
+def rated(*regs) -> RegisterSensor:
+    return RegisterSensor(key="rated_power", name="Rated power", registers=regs, kind=Kind.U32,
+                          scale=0.1, precision=0, unit=W, device_class=P, state_class=None,
+                          diagnostic=True, setting=True)
+
+
+def hours(key, name, *regs, **kw) -> RegisterSensor:
+    kind = Kind.U32 if len(regs) > 1 else Kind.U16
+    return RegisterSensor(key=key, name=name, registers=regs, kind=kind, scale=0.1,
+                          unit=UnitOfTime.HOURS, device_class=SensorDeviceClass.DURATION,
+                          state_class=TOTAL, precision=1, **kw)
 
 
 def energy(key, name, *regs, **kw) -> RegisterSensor:
@@ -567,7 +601,9 @@ SINGLE_PHASE = Family(
         energy("today_production", "Today PV production", 0x006C),
         energy("total_production", "Total PV production", 0x0060, 0x0061),
         *bms(0x0138),
+        rated(0x0010, 0x0011),
     ),
+    flags=(RegisterFlag(key="grid_relay", name="Grid relay", register=0x00C2, bit=0),),
     rated_power=(0x0010, 0x0011),
     mppt_register=0x0012,
     unit_checks=(
@@ -716,16 +752,35 @@ THREE_PHASE = Family(
         energy("total_load", "Total load consumption", 0x020F, 0x0210),
         energy("today_production", "Today PV production", 0x0211),
         energy("total_production", "Total PV production", 0x0216, 0x0217),
+        RegisterSensor(key="grid_power_factor", name="Grid power factor",
+                       registers=(0x026D,), kind=Kind.S16, scale=0.1, unit=PERCENTAGE,
+                       device_class=SensorDeviceClass.POWER_FACTOR, precision=1,
+                       enabled=False),
+        power("generator_power", "Generator power", 0x029B, 0x029F, kind=Kind.S32,
+              enabled=False),
+        energy("today_generator_production", "Today generator production", 0x0218,
+               enabled=False),
+        energy("total_generator_production", "Total generator production", 0x0219, 0x021A,
+               enabled=False),
+        hours("today_generator_runtime", "Today generator runtime", 0x021B, enabled=False),
+        hours("total_generator_runtime", "Total generator runtime", 0x0200, 0x0201,
+              enabled=False),
         *bms(0x00D2),
+        rated(0x0014, 0x0015),
     ),
+    # Deye's AC relay status word; bit 2 is the grid relay.
+    flags=(RegisterFlag(key="grid_relay", name="Grid relay", register=0x0228, bit=2),),
     rated_power=(0x0014, 0x0015),
     controls=three_phase_controls(),
 )
 
 # High voltage models scale the time of use power (x10) and voltage (x0.1)
 # differently, so they stay read only until one confirms the map.
-THREE_PHASE_HV = replace(THREE_PHASE, codes=frozenset({0x0006}), controls=(),
-                         rated_power=(), support=Support.EXPERIMENTAL)
+THREE_PHASE_HV = replace(
+    THREE_PHASE, codes=frozenset({0x0006}), controls=(), rated_power=(),
+    sensors=tuple(s for s in THREE_PHASE.sensors if s.key != "rated_power"),
+    support=Support.EXPERIMENTAL,
+)
 
 
 KNOWN_UNSUPPORTED = {
