@@ -50,6 +50,8 @@ class Kind(StrEnum):
     CLOCK = "clock"
     DEVICE_TYPE = "device_type"
     DIFFERENCE = "difference"
+    # Four hex digits, as the Deye app shows the protocol version.
+    HEX = "hex"
 
 
 class Coarse(StrEnum):
@@ -226,6 +228,8 @@ def decode(
             return ", ".join(f"F{bit + 1:02d}" for bit in _bits(raw)) or "OK"
         case Kind.DEVICE_TYPE:
             return family_for(raw).name
+        case Kind.HEX:
+            return f"{raw:04X}"
         case Kind.DIFFERENCE:
             first, second = (regs[r] for r in sensor.registers)
             return round((first - second) * scale, sensor.precision or 0)
@@ -358,6 +362,7 @@ IDENTITY = (
     RegisterSensor(key="device_type", name="Device type", registers=(REG_DEVICE_TYPE,),
                    kind=Kind.DEVICE_TYPE, state_class=None, diagnostic=True),
     RegisterSensor(key="protocol_version", name="Protocol version", registers=(REG_PROTOCOL,),
+                   kind=Kind.HEX,
                    state_class=None, diagnostic=True, enabled=False),
 )
 

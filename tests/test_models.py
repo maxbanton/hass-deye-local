@@ -332,3 +332,8 @@ def test_single_phase_rated_power():
 
     rated = next(s for s in SINGLE_PHASE.sensors if s.key == "rated_power")
     assert decode(rated, SETTINGS) == 6000
+
+
+def test_protocol_version_reads_as_in_the_deye_app():
+    protocol = next(s for s in SINGLE_PHASE.sensors if s.key == "protocol_version")
+    assert decode(protocol, {0x0002: 0x0201}) == "0201"
