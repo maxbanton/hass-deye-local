@@ -10,11 +10,18 @@ import asyncio
 import logging
 from collections.abc import Callable
 
+from bleak.backends.characteristic import BleakGATTCharacteristic
 from bleak.backends.device import BLEDevice
 from bleak_retry_connector import BleakClientWithServiceCache, establish_connection
 
 from . import protocol
-from .const import COMMAND_CHAR, NOTIFY_CHAR, REPLY_TIMEOUT
+from .const import (
+    ALT_NOTIFY_CHAR,
+    ALT_SERVICE_UUID,
+    COMMAND_CHAR,
+    NOTIFY_CHAR,
+    REPLY_TIMEOUT,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -33,6 +40,7 @@ class DeyeTransport:
     def __init__(self, device: BLEDevice) -> None:
         self._device = device
         self._client: BleakClientWithServiceCache | None = None
+        self._command_char: BleakGATTCharacteristic | None = None
         self._lock = asyncio.Lock()
         self._connect_lock = asyncio.Lock()
         self._buffer = ""
@@ -69,7 +77,10 @@ class DeyeTransport:
             if self._closed:
                 raise TransportError("transport closed while connecting")
             async with asyncio.timeout(SUBSCRIBE_TIMEOUT):
-                await self._client.start_notify(NOTIFY_CHAR, self._on_notify)
+                self._command_char, notify = self._resolve_characteristics(
+                    self._client
+                )
+                await self._client.start_notify(notify, self._on_notify)
             reply = await self._command(protocol.HANDSHAKE, protocol.handshake_complete)
             self.logger_type = protocol.parse_handshake(reply)
         except TransportError:
@@ -112,6 +123,8 @@ class DeyeTransport:
 
     async def async_disconnect(self) -> None:
         client, self._client = self._client, None
+        self._command_char = None
+
         if client is None:
             return
         try:
@@ -128,7 +141,9 @@ class DeyeTransport:
     async def _command(self, text: str, complete: Callable[[str], bool]) -> str:
         async with self._lock:
             client = self._client
-            if client is None:
+            command_char = self._command_char
+
+            if client is None or command_char is None:
                 raise TransportError("not connected")
             self._buffer = ""
             self._received.clear()
@@ -136,7 +151,7 @@ class DeyeTransport:
             try:
                 async with asyncio.timeout(REPLY_TIMEOUT):
                     await client.write_gatt_char(
-                        COMMAND_CHAR, (text + "\n").encode(), response=True
+                        command_char, (text + "\n").encode(), response=True
                     )
                     while not complete(self._buffer):
                         await self._received.wait()
@@ -164,3 +179,30 @@ class DeyeTransport:
     def _on_disconnect(self, _client: object) -> None:
         _LOGGER.debug("Logger %s disconnected", self._device.address)
         self._received.set()
+
+    def _resolve_characteristics(
+            self, client: BleakClientWithServiceCache
+    ) -> tuple[BleakGATTCharacteristic, BleakGATTCharacteristic]:
+        """Resolve the command and reply characteristics."""
+        services = client.services
+
+        # Preserve the original UUID-based lookup for legacy loggers.
+        command = services.get_characteristic(COMMAND_CHAR)
+        notify = services.get_characteristic(NOTIFY_CHAR)
+
+        if command is not None and notify is not None:
+            _LOGGER.debug("Using legacy WiBLE GATT characteristics")
+            return command, notify
+
+        # Alternative WiBLE layout using indications.
+        service = services.get_service(ALT_SERVICE_UUID)
+
+        if service is not None:
+            command = service.get_characteristic(COMMAND_CHAR)
+            notify = service.get_characteristic(ALT_NOTIFY_CHAR)
+
+            if command is not None and notify is not None:
+                _LOGGER.debug("Using alternative WiBLE FEE7 GATT layout")
+                return command, notify
+
+        raise TransportError("Unsupported WiBLE GATT layout")

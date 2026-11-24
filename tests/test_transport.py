@@ -2,12 +2,18 @@
 from __future__ import annotations
 
 import asyncio
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
 from custom_components.deye_local import protocol
-from custom_components.deye_local.const import COMMAND_CHAR, NOTIFY_CHAR
+from custom_components.deye_local.const import (
+    ALT_NOTIFY_CHAR,
+    ALT_SERVICE_UUID,
+    COMMAND_CHAR,
+    NOTIFY_CHAR,
+    SERVICE_UUID,
+)
 from custom_components.deye_local.transport import (
     DeyeTransport,
     RegisterUnavailable,
@@ -28,7 +34,15 @@ def reply_for(start: int, count: int, values: list[int]) -> str:
 class FakeLogger:
     """Answers commands like the logger: replies arrive as one or more notifications."""
 
-    def __init__(self, chunk: int = 20) -> None:
+    def __init__(
+            self,
+            chunk: int = 20,
+            service_uuid: str = SERVICE_UUID,
+            notify_char: str = NOTIFY_CHAR,
+            *,
+            has_command: bool = True,
+            has_notify: bool = True,
+    ) -> None:
         self.chunk = chunk
         self.is_connected = True
         self.written: list[tuple[str, bytes, bool]] = []
@@ -37,12 +51,41 @@ class FakeLogger:
         self.unavailable_from: int | None = None
         self._notify = None
 
+        self.service_uuid = service_uuid
+        self.notify_char = notify_char
+
+        self.command_characteristic = MagicMock()
+        self.command_characteristic.uuid = COMMAND_CHAR
+        self.command_characteristic.properties = ["write"]
+
+        self.notify_characteristic = MagicMock()
+        self.notify_characteristic.uuid = notify_char
+        self.notify_characteristic.properties = [
+            "indicate" if notify_char == ALT_NOTIFY_CHAR else "notify"
+        ]
+
+        characteristics = {}
+        if has_command:
+            characteristics[COMMAND_CHAR] = self.command_characteristic
+        if has_notify:
+            characteristics[notify_char] = self.notify_characteristic
+
+        service = MagicMock()
+        service.get_characteristic.side_effect = characteristics.get
+
+        self.services = MagicMock()
+        self.services.get_service.side_effect = (
+            lambda uuid: service if uuid == self.service_uuid else None
+        )
+        self.services.get_characteristic.side_effect = characteristics.get
+
     async def start_notify(self, char, callback) -> None:
-        assert char == NOTIFY_CHAR
+        assert char is self.notify_characteristic
         self._notify = callback
 
     async def write_gatt_char(self, char, data: bytes, response: bool) -> None:
-        self.written.append((char, data, response))
+        assert char is self.command_characteristic
+        self.written.append((char.uuid, data, response))
         if self.silent:
             return
         text = data.decode().strip()
@@ -73,15 +116,29 @@ class FakeLogger:
         self.is_connected = False
 
 
-@pytest.fixture
-def logger():
-    fake = FakeLogger()
+@pytest.fixture(
+    params=[
+        (SERVICE_UUID, NOTIFY_CHAR),
+        (ALT_SERVICE_UUID, ALT_NOTIFY_CHAR),
+    ],
+    ids=["legacy", "fee7"],
+)
+def logger(request):
+    service_uuid, notify_char = request.param
+
+    fake = FakeLogger(
+        service_uuid=service_uuid,
+        notify_char=notify_char,
+    )
 
     async def connect(*args, **kwargs):
         fake.is_connected = True
         return fake
 
-    with patch("custom_components.deye_local.transport.establish_connection", connect):
+    with patch(
+            "custom_components.deye_local.transport.establish_connection",
+            connect,
+    ):
         yield fake
 
 
@@ -333,3 +390,98 @@ def test_fresher_device_is_used(transport) -> None:
     info = service_info()
     transport.set_device(info.device)
     assert transport._device is info.device
+
+@pytest.mark.parametrize(
+    "service_uuid,notify_char,has_command,has_notify",
+    [
+        (ALT_SERVICE_UUID, ALT_NOTIFY_CHAR, False, True),
+        (ALT_SERVICE_UUID, ALT_NOTIFY_CHAR, True, False),
+        (SERVICE_UUID, NOTIFY_CHAR, False, True),
+        (SERVICE_UUID, NOTIFY_CHAR, True, False),
+        (SERVICE_UUID, NOTIFY_CHAR, False, False),
+        (
+                "0000ffff-0000-1000-8000-00805f9b34fb",
+                ALT_NOTIFY_CHAR,
+                True,
+                True,
+        ),
+    ],
+)
+async def test_unsupported_gatt_layout(
+        transport, service_uuid, notify_char, has_command, has_notify
+) -> None:
+    fake = FakeLogger(
+        service_uuid=service_uuid,
+        notify_char=notify_char,
+        has_command=has_command,
+        has_notify=has_notify,
+    )
+
+    async def connect(*args, **kwargs):
+        return fake
+
+    with (
+        patch(
+            "custom_components.deye_local.transport.establish_connection",
+            connect,
+        ),
+        pytest.raises(
+            TransportError,
+            match="Unsupported WiBLE GATT layout",
+        ),
+    ):
+        await transport.async_connect()
+
+    assert not transport.connected
+    assert not fake.is_connected
+    assert not fake.written
+
+async def test_legacy_characteristics_in_another_service(
+        transport,
+) -> None:
+    fake = FakeLogger(
+        service_uuid="0000ffff-0000-1000-8000-00805f9b34fb",
+        notify_char=NOTIFY_CHAR,
+    )
+
+    async def connect(*args, **kwargs):
+        return fake
+
+    with patch(
+            "custom_components.deye_local.transport.establish_connection",
+            connect,
+    ):
+        await transport.async_connect()
+        assert await transport.async_read(0, 1) == [3]
+        await transport.async_disconnect()
+
+async def test_reconnect_resolves_fresh_characteristics(
+        transport,
+) -> None:
+    first = FakeLogger()
+    second = FakeLogger(
+        service_uuid=ALT_SERVICE_UUID,
+        notify_char=ALT_NOTIFY_CHAR,
+    )
+
+    clients = iter([first, second])
+
+    async def connect(*args, **kwargs):
+        return next(clients)
+
+    with patch(
+            "custom_components.deye_local.transport.establish_connection",
+            connect,
+    ):
+        await transport.async_connect()
+        assert await transport.async_read(0, 1) == [3]
+        await transport.async_disconnect()
+
+        await transport.async_connect()
+        assert await transport.async_read(0, 1) == [3]
+        await transport.async_disconnect()
+
+    assert len(first.written) == 2
+    assert len(second.written) == 2
+    assert not first.is_connected
+    assert not second.is_connected

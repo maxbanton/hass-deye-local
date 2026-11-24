@@ -10,7 +10,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.deye_local.config_flow import Identity
+from custom_components.deye_local.config_flow import Identity, _is_logger
 from custom_components.deye_local.const import (
     CONF_DEVICE_TYPE,
     CONF_KEEP_CONNECTED,
@@ -172,3 +172,94 @@ async def test_identify_reads_the_model_and_serial_and_lets_go() -> None:
     assert identity.device_type == 3
     assert identity.serial == "2603125693"
     assert not FakeTransport.instances[-1].connected
+
+@pytest.mark.parametrize(
+    "name,manufacturer_data,expected",
+    [
+        ("AP_9876543210", {0x3030: b"\x30"}, True),
+        ("AP_1234567890", {0x3030: b"\x30"}, True),
+        ("AP_9876543210", {}, False),
+        ("AP_9876543210", {0x3030: b"\x31"}, False),
+        ("AP_9876543210", {0x3031: b"\x30"}, False),
+        ("AP_123", {0x3030: b"\x30"}, False),
+        ("AP_123456789A", {0x3030: b"\x30"}, False),
+        ("OTHER_DEVICE", {0x3030: b"\x30"}, False),
+        ("AP_12345678901", {0x3030: b"\x30"}, False),
+        ("AP_１２３４５６７８９０", {0x3030: b"\x30"}, False),
+    ],
+)
+def test_alternative_wible_advertisement(
+        name, manufacturer_data, expected
+) -> None:
+    info = service_info(
+        name=name,
+        service_uuids=[],
+        manufacturer_data=manufacturer_data,
+    )
+    assert _is_logger(info) is expected
+
+
+def test_legacy_wible_advertisement() -> None:
+    assert _is_logger(service_info())
+
+async def test_user_flow_discovers_alternative_wible(
+        hass: HomeAssistant,
+) -> None:
+    info = service_info(
+        name="AP_9876543210",
+        service_uuids=[],
+        manufacturer_data={0x3030: b"\x30"},
+    )
+
+    with patch(DISCOVERED, return_value=[info]):
+        result = await hass.config_entries.flow.async_init(
+            DOMAIN, context={"source": SOURCE_USER}
+        )
+
+    assert result["type"] is FlowResultType.FORM
+    assert result["step_id"] == "user"
+
+    with patch(IDENTIFY, AsyncMock(return_value=SINGLE_PHASE)):
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], {CONF_ADDRESS: ADDRESS}
+        )
+
+    assert result["step_id"] == "confirm"
+
+async def test_bluetooth_discovery_of_alternative_wible(
+        hass: HomeAssistant,
+) -> None:
+    info = service_info(
+        name="AP_9876543210",
+        service_uuids=[],
+        manufacturer_data={0x3030: b"\x30"},
+    )
+
+    result = await _discover(hass, info=info)
+
+    assert result["step_id"] == "confirm"
+
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {}
+    )
+
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert result["result"].unique_id == ADDRESS
+
+async def test_bluetooth_discovery_rejects_unrelated_device(
+        hass: HomeAssistant,
+) -> None:
+    info = service_info(
+        name="AP_9876543210",
+        service_uuids=[],
+        manufacturer_data={0x3030: b"\x31"},
+    )
+
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN,
+        context={"source": SOURCE_BLUETOOTH},
+        data=info,
+    )
+
+    assert result["type"] is FlowResultType.ABORT
+    assert result["reason"] == "no_devices_found"
