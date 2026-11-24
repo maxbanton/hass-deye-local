@@ -91,11 +91,17 @@ THREE_PHASE_HIGH_WORDS = {
 }
 
 
-def test_three_phase_totals_read_one_signed_register():
+UNSIGNED_TOTALS = ("ups_power", "load_power")
+
+
+def test_three_phase_totals_read_one_register():
     sensors = {s.key: s for s in THREE_PHASE.sensors}
     for key in THREE_PHASE_TOTALS:
-        assert sensors[key].kind is Kind.S16, key
+        expected = Kind.U16 if key in UNSIGNED_TOTALS else Kind.S16
+        assert sensors[key].kind is expected, key
         assert len(sensors[key].registers) == 1, key
+    for part in ("ups", "load"):
+        assert all(sensors[f"{part}_l{n}_power"].kind is Kind.U16 for n in (1, 2, 3)), part
     assert not THREE_PHASE_HIGH_WORDS & set(THREE_PHASE.registers)
 
 
@@ -103,8 +109,15 @@ def test_three_phase_totals_read_one_signed_register():
     "word,watts",
     [(0x000D, 13), (0xFFD3, -45), (0xFFDF, -33), (0x000E, 14), (0x7FFF, 32767), (0x8000, -32768)],
 )
-@pytest.mark.parametrize("key", THREE_PHASE_TOTALS)
-def test_three_phase_totals_are_signed(key, word, watts):
+@pytest.mark.parametrize("key", [k for k in THREE_PHASE_TOTALS if k not in UNSIGNED_TOTALS])
+def test_three_phase_signed_totals(key, word, watts):
+    sensor = next(s for s in THREE_PHASE.sensors if s.key == key)
+    assert decode(sensor, {sensor.registers[0]: word}) == watts
+
+
+@pytest.mark.parametrize("word,watts", [(0x0037, 55), (0x8000, 32768), (0xBB80, 48000)])
+@pytest.mark.parametrize("key", UNSIGNED_TOTALS)
+def test_three_phase_load_and_ups_are_unsigned(key, word, watts):
     sensor = next(s for s in THREE_PHASE.sensors if s.key == key)
     assert decode(sensor, {sensor.registers[0]: word}) == watts
 

@@ -704,9 +704,10 @@ THREE_PHASE = Family(
                 0x0262),
         *phases(amps, "external_ct_l{}_current", "External CT L{} current", 0x0265),
         hertz("grid_frequency", "Grid frequency", 0x0261),
-        # Totals are read from their original signed 16-bit registers, which hold
-        # readings up to 32,767 W. Protocol V104 added high words for larger ones, but
-        # near 0 W the two words can disagree in sign and the reading jumps by 65,536 W.
+        # Totals are read from their original 16-bit registers: signed up to 32,767 W,
+        # load and UPS unsigned up to 65,535 W. Protocol V104 added high words for
+        # larger ones, but near 0 W the two words can disagree in sign and the reading
+        # jumps by 65,536 W.
         power("grid_power", "Grid power", 0x0271),
         power("grid_l1_power", "Grid L1 power", 0x026E, enabled=False),
         power("grid_l2_power", "Grid L2 power", 0x026F, enabled=False),
@@ -717,11 +718,11 @@ THREE_PHASE = Family(
         *phases(volts, "inverter_l{}_voltage", "Inverter L{} voltage", 0x0273),
         *phases(amps, "inverter_l{}_current", "Inverter L{} current", 0x0276),
         *phases(power, "inverter_l{}_power", "Inverter L{} power", 0x0279),
-        power("ups_power", "UPS power", 0x0283),
-        *phases(power, "ups_l{}_power", "UPS L{} power", 0x0280),
-        power("load_power", "Load power", 0x028D),
+        power("ups_power", "UPS power", 0x0283, kind=Kind.U16),
+        *phases(power, "ups_l{}_power", "UPS L{} power", 0x0280, kind=Kind.U16),
+        power("load_power", "Load power", 0x028D, kind=Kind.U16),
         *phases(volts, "load_l{}_voltage", "Load L{} voltage", 0x0284),
-        *phases(power, "load_l{}_power", "Load L{} power", 0x028A),
+        *phases(power, "load_l{}_power", "Load L{} power", 0x028A, kind=Kind.U16),
         hertz("load_frequency", "Load frequency", 0x028F, enabled=False),
         power("pv1_power", "PV1 power", 0x02A0, kind=Kind.U16),
         power("pv2_power", "PV2 power", 0x02A1, kind=Kind.U16),
