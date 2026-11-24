@@ -39,11 +39,6 @@ class Kind(StrEnum):
     U16 = "u16"
     S16 = "s16"
     U32 = "u32"
-    S32 = "s32"
-    # Signed 32-bit value whose high word some three-phase models update apart from the
-    # low word: near 0 W the two can disagree in sign, so a high word of 0x0000 or
-    # 0xFFFF only extends the signed low word.
-    S32_LOW_SIGNED = "s32_low_signed"
     STATE = "state"
     ALARM = "alarm"
     FAULT = "fault"
@@ -211,13 +206,7 @@ def decode(
         return None
     width = 16 * len(sensor.registers)
     match sensor.kind:
-        case Kind.S16 | Kind.S32:
-            if raw >= 1 << (width - 1):
-                raw -= 1 << width
-        case Kind.S32_LOW_SIGNED:
-            if raw >> 16 in (0x0000, 0xFFFF):
-                raw &= 0xFFFF
-                width = 16
+        case Kind.S16:
             if raw >= 1 << (width - 1):
                 raw -= 1 << width
         case Kind.STATE:
@@ -715,23 +704,22 @@ THREE_PHASE = Family(
                 0x0262),
         *phases(amps, "external_ct_l{}_current", "External CT L{} current", 0x0265),
         hertz("grid_frequency", "Grid frequency", 0x0261),
-        power("grid_power", "Grid power", 0x0271, 0x02B2, kind=Kind.S32_LOW_SIGNED),
-        power("grid_l1_power", "Grid L1 power", 0x026E, 0x02AF, kind=Kind.S32_LOW_SIGNED,
-              enabled=False),
-        power("grid_l2_power", "Grid L2 power", 0x026F, 0x02B0, kind=Kind.S32_LOW_SIGNED,
-              enabled=False),
-        power("grid_l3_power", "Grid L3 power", 0x0270, 0x02B1, kind=Kind.S32_LOW_SIGNED,
-              enabled=False),
-        power("external_ct_power", "External CT power", 0x026B, 0x02C4, kind=Kind.S32,
-              enabled=False),
+        # Totals are read from their original signed 16-bit registers, which hold
+        # readings up to 32,767 W. Protocol V104 added high words for larger ones, but
+        # near 0 W the two words can disagree in sign and the reading jumps by 65,536 W.
+        power("grid_power", "Grid power", 0x0271),
+        power("grid_l1_power", "Grid L1 power", 0x026E, enabled=False),
+        power("grid_l2_power", "Grid L2 power", 0x026F, enabled=False),
+        power("grid_l3_power", "Grid L3 power", 0x0270, enabled=False),
+        power("external_ct_power", "External CT power", 0x026B, enabled=False),
         *phases(power, "external_ct_l{}_power", "External CT L{} power", 0x0268),
-        power("inverter_power", "Inverter power", 0x027C, 0x02B6, kind=Kind.S32),
+        power("inverter_power", "Inverter power", 0x027C),
         *phases(volts, "inverter_l{}_voltage", "Inverter L{} voltage", 0x0273),
         *phases(amps, "inverter_l{}_current", "Inverter L{} current", 0x0276),
         *phases(power, "inverter_l{}_power", "Inverter L{} power", 0x0279),
-        power("ups_power", "UPS power", 0x0283, 0x02BB, kind=Kind.S32),
+        power("ups_power", "UPS power", 0x0283),
         *phases(power, "ups_l{}_power", "UPS L{} power", 0x0280),
-        power("load_power", "Load power", 0x028D, 0x0293, kind=Kind.S32),
+        power("load_power", "Load power", 0x028D),
         *phases(volts, "load_l{}_voltage", "Load L{} voltage", 0x0284),
         *phases(power, "load_l{}_power", "Load L{} power", 0x028A),
         hertz("load_frequency", "Load frequency", 0x028F, enabled=False),
@@ -761,8 +749,7 @@ THREE_PHASE = Family(
                        registers=(0x026D,), kind=Kind.S16, scale=0.1, unit=PERCENTAGE,
                        device_class=SensorDeviceClass.POWER_FACTOR, precision=1,
                        enabled=False),
-        power("generator_power", "Generator power", 0x029B, 0x029F, kind=Kind.S32,
-              enabled=False),
+        power("generator_power", "Generator power", 0x029B, enabled=False),
         energy("today_generator_production", "Today generator production", 0x0218,
                enabled=False),
         energy("total_generator_production", "Total generator production", 0x0219, 0x021A,

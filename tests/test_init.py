@@ -9,6 +9,7 @@ from homeassistant.config_entries import ConfigEntryState
 from homeassistant.const import CONF_ADDRESS, STATE_UNAVAILABLE
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers import issue_registry as ir
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
@@ -25,6 +26,7 @@ from custom_components.deye_local.models import Coarse
 
 from .common import ADDRESS, FakeTransport, service_info
 from .snapshot import BATTERIES, SNAPSHOT, SNAPSHOT_10K
+from .three_phase_dumps import SG04LP3_10K_SOLAR_SELL_OFF, SG04LP3_10K_SOLAR_SELL_ON, SG05LP3_12K
 
 BATTERY_1 = "25007000E4020510"
 BATTERY_2 = "25007000E1260830"
@@ -533,3 +535,62 @@ async def test_single_phase_grid_relay_and_rated_power(hass: HomeAssistant) -> N
     coordinator.async_set_updated_data({**coordinator.data, 0x00C2: 0})
     await hass.async_block_till_done()
     assert hass.states.get(f"binary_sensor.{one}_grid_relay").state == "off"
+
+
+THREE = "sensor.deye_three_phase_hybrid"
+THREE_PHASE_SPLITS = {
+    "grid_power": "grid_l{}_power",
+    "external_ct_power": "external_ct_l{}_power",
+    "inverter_power": "inverter_l{}_power",
+    "ups_power": "ups_l{}_power",
+    "load_power": "load_l{}_power",
+}
+
+
+async def _setup_three_phase(hass: HomeAssistant, registers: dict[int, int]) -> MockConfigEntry:
+    """Set up a three phase hybrid on a dump, with its disabled totals enabled."""
+    registry = er.async_get(hass)
+    for key in ("grid_l1_power", "grid_l2_power", "grid_l3_power", "external_ct_power"):
+        registry.async_get_or_create(
+            "sensor", DOMAIN, f"2603125693_{key}",
+            suggested_object_id=f"deye_three_phase_hybrid_{key}",
+        )
+    with patch(
+        "custom_components.deye_local.coordinator.DeyeTransport",
+        lambda device: FakeTransport(device, registers),
+    ):
+        return await _setup(hass, device_type=5)
+
+
+def _watts(hass: HomeAssistant, key: str) -> float:
+    return float(hass.states.get(f"{THREE}_{key}").state)
+
+
+@pytest.mark.parametrize(
+    "registers,expected",
+    [
+        (SG04LP3_10K_SOLAR_SELL_OFF,
+         {"grid_power": 12, "inverter_power": 1664, "load_power": 1669}),
+        (SG04LP3_10K_SOLAR_SELL_ON,
+         {"grid_power": 12, "inverter_power": 3833, "load_power": 3847}),
+        (SG05LP3_12K, {"external_ct_power": 2766, "inverter_power": -106, "ups_power": 2648}),
+    ],
+    ids=["10k-solar-sell-off", "10k-solar-sell-on", "12k"],
+)
+async def test_three_phase_dumps_add_up(hass: HomeAssistant, registers, expected) -> None:
+    await _setup_three_phase(hass, registers)
+    for key, watts in expected.items():
+        assert _watts(hass, key) == watts, key
+    for total, phase in THREE_PHASE_SPLITS.items():
+        assert _watts(hass, total) == sum(_watts(hass, phase.format(n)) for n in (1, 2, 3)), total
+
+
+async def test_three_phase_totals_never_read_the_high_words(hass: HomeAssistant) -> None:
+    # External CT power near 0 W from issue #11: the stale high words would have read
+    # +65,503 W and -65,522 W.
+    registers = {**SG05LP3_12K, 0x026B: 0xFFDF, 0x02C4: 0x0000, 0x0271: 0x000E, 0x02B2: 0xFFFF}
+    await _setup_three_phase(hass, registers)
+    assert _watts(hass, "external_ct_power") == -33
+    assert _watts(hass, "grid_power") == 14
+    # Load and generator high words still arrive inside the reads of their neighbours.
+    assert all(start + count <= 0x02AF for start, count in transport().reads if start < 0x2700)
