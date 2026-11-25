@@ -27,6 +27,8 @@ from .const import (
     MAX_SCAN_INTERVAL,
     MIN_SCAN_INTERVAL,
     SERVICE_UUID,
+    WIBLE_MANUFACTURER_DATA,
+    WIBLE_MANUFACTURER_ID,
 )
 from .models import IDENTITY_BLOCK, REG_DEVICE_TYPE, REG_SERIAL, Support, family_for
 from .protocol import decode_ascii
@@ -69,8 +71,21 @@ SUPPORT_TEXT = {
 
 
 def _is_logger(info: BluetoothServiceInfoBleak) -> bool:
-    return SERVICE_UUID in info.service_uuids
+    """Recognize both supported WiBLE advertising layouts."""
+    if SERVICE_UUID in info.service_uuids:
+        return True
 
+    name = info.name or ""
+    serial = name[3:]
+
+    return (
+            name.startswith("AP_")
+            and len(serial) == 10
+            and serial.isascii()
+            and serial.isdigit()
+            and info.manufacturer_data.get(WIBLE_MANUFACTURER_ID)
+            == WIBLE_MANUFACTURER_DATA
+    )
 
 def _display_name(info: BluetoothServiceInfoBleak) -> str:
     """The logger advertises its serial as its name, but only in scan responses."""
@@ -96,12 +111,17 @@ class DeyeLocalConfigFlow(ConfigFlow, domain=DOMAIN):
         return DeyeLocalOptionsFlow()
 
     async def async_step_bluetooth(
-        self, discovery_info: BluetoothServiceInfoBleak
+            self, discovery_info: BluetoothServiceInfoBleak
     ) -> ConfigFlowResult:
+        if not _is_logger(discovery_info):
+            return self.async_abort(reason="no_devices_found")
+
         await self.async_set_unique_id(discovery_info.address)
         self._abort_if_unique_id_configured()
         self._info = discovery_info
-        self.context["title_placeholders"] = {"name": _display_name(discovery_info)}
+        self.context["title_placeholders"] = {
+            "name": _display_name(discovery_info)
+        }
         return await self.async_step_bluetooth_confirm()
 
     async def async_step_bluetooth_confirm(

@@ -14,27 +14,40 @@ ADDRESS = "88:A6:8D:2C:4F:15"
 NAME = "D26109249480"
 
 
-def service_info(address: str = ADDRESS, name: str = NAME) -> BluetoothServiceInfoBleak:
+def service_info(
+        address: str = ADDRESS,
+        name: str = NAME,
+        *,
+        service_uuids: list[str] | None = None,
+        manufacturer_data: dict[int, bytes] | None = None,
+) -> BluetoothServiceInfoBleak:
+    if service_uuids is None:
+        service_uuids = [SERVICE_UUID]
+    if manufacturer_data is None:
+        manufacturer_data = {}
+
     try:
         device = BLEDevice(address, name, None)
     except TypeError:  # bleak before 1.0 still required rssi
         device = BLEDevice(address, name, None, -60)
+
     advertisement = AdvertisementData(
         local_name=name,
-        manufacturer_data={},
+        manufacturer_data=manufacturer_data,
         service_data={},
-        service_uuids=[SERVICE_UUID],
+        service_uuids=service_uuids,
         tx_power=None,
         rssi=-60,
         platform_data=(),
     )
+
     return BluetoothServiceInfoBleak(
         name=name,
         address=address,
         rssi=-60,
-        manufacturer_data={},
+        manufacturer_data=manufacturer_data,
         service_data={},
-        service_uuids=[SERVICE_UUID],
+        service_uuids=service_uuids,
         source="local",
         device=device,
         advertisement=advertisement,
@@ -42,7 +55,6 @@ def service_info(address: str = ADDRESS, name: str = NAME) -> BluetoothServiceIn
         time=0,
         tx_power=None,
     )
-
 
 class FakeTransport:
     """Serves registers from a snapshot; unknown registers read as zero."""

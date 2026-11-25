@@ -54,3 +54,11 @@ UNIT_CHECK_POLLS = 3
 
 # The logger does not answer large reads.
 MAX_BLOCK = 16
+
+# Alternative WiBLE advertising signature.
+WIBLE_MANUFACTURER_ID = 0x3030
+WIBLE_MANUFACTURER_DATA = b"\x30"
+
+# Alternative WiBLE GATT layout using indications.
+ALT_SERVICE_UUID = "0000fee7-0000-1000-8000-00805f9b34fb"
+ALT_NOTIFY_CHAR = "0000fed6-0000-1000-8000-00805f9b34fb"
