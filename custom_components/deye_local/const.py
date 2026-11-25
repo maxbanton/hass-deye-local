@@ -5,7 +5,7 @@ from __future__ import annotations
 DOMAIN = "deye_local"
 MANUFACTURER = "Deye"
 
-# GATT layout of the WiBLE data logger. Commands are ASCII lines written to the
+# GATT layout of loggers that advertise service 0922. Commands are ASCII lines written to the
 # command characteristic (write with response); replies arrive as notifications.
 SERVICE_UUID = "00000922-0000-1000-8000-00805f9b34fb"
 COMMAND_CHAR = "0000fec7-0000-1000-8000-00805f9b34fb"
@@ -56,10 +56,11 @@ UNIT_CHECK_POLLS = 3
 # The logger does not answer large reads.
 MAX_BLOCK = 16
 
-# Alternative WiBLE advertising signature.
-WIBLE_MANUFACTURER_ID = 0x3030
-WIBLE_MANUFACTURER_DATA = b"\x30"
+# Loggers named AP_ plus 10 digits advertise no service, only this manufacturer data.
+AP_MANUFACTURER_ID = 0x3030
+AP_MANUFACTURER_DATA = b"\x30"
 
-# Alternative WiBLE GATT layout using indications.
-ALT_SERVICE_UUID = "0000fee7-0000-1000-8000-00805f9b34fb"
-ALT_NOTIFY_CHAR = "0000fed6-0000-1000-8000-00805f9b34fb"
+# Layout of the AP_ loggers: the same command characteristic under service FEE7,
+# replies on FED6 as indications.
+FEE7_SERVICE_UUID = "0000fee7-0000-1000-8000-00805f9b34fb"
+FEE7_NOTIFY_CHAR = "0000fed6-0000-1000-8000-00805f9b34fb"

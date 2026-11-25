@@ -17,9 +17,9 @@ from bleak_retry_connector import BleakClientWithServiceCache, establish_connect
 
 from . import protocol
 from .const import (
-    ALT_NOTIFY_CHAR,
-    ALT_SERVICE_UUID,
     COMMAND_CHAR,
+    FEE7_NOTIFY_CHAR,
+    FEE7_SERVICE_UUID,
     NOTIFY_CHAR,
     REPLY_TIMEOUT,
 )
@@ -183,23 +183,22 @@ class DeyeTransport:
         """Resolve the command and reply characteristics."""
         services = client.services
 
-        # Preserve the original UUID-based lookup for legacy loggers.
+        # FEC7 and FED8 are found in whichever service holds them.
         command = services.get_characteristic(COMMAND_CHAR)
         notify = services.get_characteristic(NOTIFY_CHAR)
 
         if command is not None and notify is not None:
-            _LOGGER.debug("Using legacy WiBLE GATT characteristics")
+            _LOGGER.debug("Using the 0922 GATT layout")
             return command, notify
 
-        # Alternative WiBLE layout using indications.
-        service = services.get_service(ALT_SERVICE_UUID)
+        service = services.get_service(FEE7_SERVICE_UUID)
 
         if service is not None:
             command = service.get_characteristic(COMMAND_CHAR)
-            notify = service.get_characteristic(ALT_NOTIFY_CHAR)
+            notify = service.get_characteristic(FEE7_NOTIFY_CHAR)
 
             if command is not None and notify is not None:
-                _LOGGER.debug("Using alternative WiBLE FEE7 GATT layout")
+                _LOGGER.debug("Using the FEE7 GATT layout")
                 return command, notify
 
-        raise TransportError("Unsupported WiBLE GATT layout")
+        raise TransportError("unsupported GATT layout")

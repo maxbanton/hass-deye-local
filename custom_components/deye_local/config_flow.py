@@ -18,6 +18,8 @@ from homeassistant.const import CONF_ADDRESS
 from homeassistant.core import callback
 
 from .const import (
+    AP_MANUFACTURER_DATA,
+    AP_MANUFACTURER_ID,
     CONF_DEVICE_TYPE,
     CONF_KEEP_CONNECTED,
     CONF_SCAN_INTERVAL,
@@ -28,8 +30,6 @@ from .const import (
     MAX_SCAN_INTERVAL,
     MIN_SCAN_INTERVAL,
     SERVICE_UUID,
-    WIBLE_MANUFACTURER_DATA,
-    WIBLE_MANUFACTURER_ID,
 )
 from .models import IDENTITY_BLOCK, REG_DEVICE_TYPE, REG_SERIAL, Support, family_for
 from .protocol import decode_ascii
@@ -72,7 +72,7 @@ SUPPORT_TEXT = {
 
 
 def _is_logger(info: BluetoothServiceInfoBleak) -> bool:
-    """Recognize both supported WiBLE advertising layouts."""
+    """Service 0922, or an AP_ name with 10 digits and the AP_ manufacturer data."""
     if SERVICE_UUID in info.service_uuids:
         return True
 
@@ -84,7 +84,7 @@ def _is_logger(info: BluetoothServiceInfoBleak) -> bool:
         and len(serial) == 10
         and serial.isascii()
         and serial.isdigit()
-        and info.manufacturer_data.get(WIBLE_MANUFACTURER_ID) == WIBLE_MANUFACTURER_DATA
+        and info.manufacturer_data.get(AP_MANUFACTURER_ID) == AP_MANUFACTURER_DATA
     )
 
 

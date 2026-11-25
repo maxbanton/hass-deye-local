@@ -9,9 +9,9 @@ import pytest
 
 from custom_components.deye_local import protocol
 from custom_components.deye_local.const import (
-    ALT_NOTIFY_CHAR,
-    ALT_SERVICE_UUID,
     COMMAND_CHAR,
+    FEE7_NOTIFY_CHAR,
+    FEE7_SERVICE_UUID,
     NOTIFY_CHAR,
     SERVICE_UUID,
 )
@@ -62,7 +62,7 @@ class FakeLogger:
         self.notify_characteristic = MagicMock()
         self.notify_characteristic.uuid = notify_char
         self.notify_characteristic.properties = [
-            "indicate" if notify_char == ALT_NOTIFY_CHAR else "notify"
+            "indicate" if notify_char == FEE7_NOTIFY_CHAR else "notify"
         ]
 
         characteristics = {}
@@ -120,9 +120,9 @@ class FakeLogger:
 @pytest.fixture(
     params=[
         (SERVICE_UUID, NOTIFY_CHAR),
-        (ALT_SERVICE_UUID, ALT_NOTIFY_CHAR),
+        (FEE7_SERVICE_UUID, FEE7_NOTIFY_CHAR),
     ],
-    ids=["legacy", "fee7"],
+    ids=["0922", "fee7"],
 )
 def logger(request):
     service_uuid, notify_char = request.param
@@ -396,14 +396,14 @@ def test_fresher_device_is_used(transport) -> None:
 @pytest.mark.parametrize(
     "service_uuid,notify_char,has_command,has_notify",
     [
-        (ALT_SERVICE_UUID, ALT_NOTIFY_CHAR, False, True),
-        (ALT_SERVICE_UUID, ALT_NOTIFY_CHAR, True, False),
+        (FEE7_SERVICE_UUID, FEE7_NOTIFY_CHAR, False, True),
+        (FEE7_SERVICE_UUID, FEE7_NOTIFY_CHAR, True, False),
         (SERVICE_UUID, NOTIFY_CHAR, False, True),
         (SERVICE_UUID, NOTIFY_CHAR, True, False),
         (SERVICE_UUID, NOTIFY_CHAR, False, False),
         (
             "0000ffff-0000-1000-8000-00805f9b34fb",
-            ALT_NOTIFY_CHAR,
+            FEE7_NOTIFY_CHAR,
             True,
             True,
         ),
@@ -429,7 +429,7 @@ async def test_unsupported_gatt_layout(
         ),
         pytest.raises(
             TransportError,
-            match="Unsupported WiBLE GATT layout",
+            match="unsupported GATT layout",
         ),
     ):
         await transport.async_connect()
@@ -439,7 +439,7 @@ async def test_unsupported_gatt_layout(
     assert not fake.written
 
 
-async def test_legacy_characteristics_in_another_service(
+async def test_0922_characteristics_in_another_service(
     transport,
 ) -> None:
     fake = FakeLogger(
@@ -464,8 +464,8 @@ async def test_reconnect_resolves_fresh_characteristics(
 ) -> None:
     first = FakeLogger()
     second = FakeLogger(
-        service_uuid=ALT_SERVICE_UUID,
-        notify_char=ALT_NOTIFY_CHAR,
+        service_uuid=FEE7_SERVICE_UUID,
+        notify_char=FEE7_NOTIFY_CHAR,
     )
 
     clients = iter([first, second])

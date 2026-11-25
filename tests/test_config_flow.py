@@ -184,7 +184,7 @@ async def test_identify_reads_the_model_and_serial_and_lets_go() -> None:
         ("AP_１２３４５６７８９０", {0x3030: b"\x30"}, False),
     ],
 )
-def test_alternative_wible_advertisement(name, manufacturer_data, expected) -> None:
+def test_ap_logger_advertisement(name, manufacturer_data, expected) -> None:
     info = service_info(
         name=name,
         service_uuids=[],
@@ -193,11 +193,11 @@ def test_alternative_wible_advertisement(name, manufacturer_data, expected) -> N
     assert _is_logger(info) is expected
 
 
-def test_legacy_wible_advertisement() -> None:
+def test_0922_advertisement() -> None:
     assert _is_logger(service_info())
 
 
-async def test_user_flow_discovers_alternative_wible(
+async def test_user_flow_discovers_ap_logger(
     hass: HomeAssistant,
 ) -> None:
     info = service_info(
@@ -220,7 +220,7 @@ async def test_user_flow_discovers_alternative_wible(
     assert result["step_id"] == "confirm"
 
 
-async def test_bluetooth_discovery_of_alternative_wible(
+async def test_bluetooth_discovery_of_ap_logger(
     hass: HomeAssistant,
 ) -> None:
     info = service_info(
