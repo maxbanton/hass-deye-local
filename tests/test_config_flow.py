@@ -83,7 +83,7 @@ async def test_bluetooth_discovery_creates_an_entry(hass: HomeAssistant) -> None
 
 
 async def test_experimental_family_is_flagged(hass: HomeAssistant) -> None:
-    result = await _discover(hass, identify=AsyncMock(return_value=Identity(0x0005, "X")))
+    result = await _discover(hass, identify=AsyncMock(return_value=Identity(0x0006, "X")))
     assert result["description_placeholders"]["support"].startswith("Experimental")
 
 

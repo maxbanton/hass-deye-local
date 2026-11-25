@@ -20,6 +20,7 @@ from homeassistant.const import (
     UnitOfFrequency,
     UnitOfPower,
     UnitOfTemperature,
+    UnitOfTime,
 )
 
 REG_DEVICE_TYPE = 0x0000
@@ -38,17 +39,14 @@ class Kind(StrEnum):
     U16 = "u16"
     S16 = "s16"
     U32 = "u32"
-    S32 = "s32"
-    # Signed 32-bit value whose high word some three-phase models update apart from the
-    # low word: near 0 W the two can disagree in sign, so a high word of 0x0000 or
-    # 0xFFFF only extends the signed low word.
-    S32_LOW_SIGNED = "s32_low_signed"
     STATE = "state"
     ALARM = "alarm"
     FAULT = "fault"
     CLOCK = "clock"
     DEVICE_TYPE = "device_type"
     DIFFERENCE = "difference"
+    # Four hex digits, as the Deye app shows the protocol version.
+    HEX = "hex"
 
 
 class Coarse(StrEnum):
@@ -101,6 +99,19 @@ class RegisterSensor:
     coarse: Coarse | None = None
     # PV string the sensor belongs to, when the unit may not have it.
     string: int | None = None
+    # Fixed values, read with the settings instead of on every poll.
+    setting: bool = False
+
+
+@dataclass(frozen=True, kw_only=True)
+class RegisterFlag:
+    """One bit of a status register, shown as a binary sensor."""
+
+    key: str
+    name: str
+    register: int
+    bit: int
+    enabled: bool = True
 
 
 class ControlPlatform(StrEnum):
@@ -146,6 +157,7 @@ class Family:
     codes: frozenset[int]
     support: Support
     sensors: tuple[RegisterSensor, ...] = field(default=())
+    flags: tuple[RegisterFlag, ...] = field(default=())
     has_battery_modules: bool = False
     controls: tuple[Control, ...] = field(default=())
     rated_power: tuple[int, ...] = field(default=())
@@ -159,12 +171,18 @@ class Family:
 
     @property
     def registers(self) -> set[int]:
-        return {reg for sensor in self.sensors for reg in sensor.registers}
+        return {
+            reg for sensor in self.sensors if not sensor.setting for reg in sensor.registers
+        } | {flag.register for flag in self.flags}
 
     @property
     def setting_registers(self) -> set[int]:
         mppt = {self.mppt_register} if self.mppt_register is not None else set()
-        return {control.register for control in self.controls} | set(self.rated_power) | mppt
+        fixed = {reg for sensor in self.sensors if sensor.setting for reg in sensor.registers}
+        return (
+            {control.register for control in self.controls}
+            | set(self.rated_power) | mppt | fixed
+        )
 
 
 def _words(regs: dict[int, int], addresses: tuple[int, ...]) -> int:
@@ -188,13 +206,7 @@ def decode(
         return None
     width = 16 * len(sensor.registers)
     match sensor.kind:
-        case Kind.S16 | Kind.S32:
-            if raw >= 1 << (width - 1):
-                raw -= 1 << width
-        case Kind.S32_LOW_SIGNED:
-            if raw >> 16 in (0x0000, 0xFFFF):
-                raw &= 0xFFFF
-                width = 16
+        case Kind.S16:
             if raw >= 1 << (width - 1):
                 raw -= 1 << width
         case Kind.STATE:
@@ -205,6 +217,8 @@ def decode(
             return ", ".join(f"F{bit + 1:02d}" for bit in _bits(raw)) or "OK"
         case Kind.DEVICE_TYPE:
             return family_for(raw).name
+        case Kind.HEX:
+            return f"{raw:04X}"
         case Kind.DIFFERENCE:
             first, second = (regs[r] for r in sensor.registers)
             return round((first - second) * scale, sensor.precision or 0)
@@ -252,6 +266,19 @@ def power(key, name, *regs, kind=Kind.S16, **kw) -> RegisterSensor:
                           device_class=P, **kw)
 
 
+def rated(*regs) -> RegisterSensor:
+    return RegisterSensor(key="rated_power", name="Rated power", registers=regs, kind=Kind.U32,
+                          scale=0.1, precision=0, unit=W, device_class=P, state_class=None,
+                          diagnostic=True, setting=True)
+
+
+def hours(key, name, *regs, **kw) -> RegisterSensor:
+    kind = Kind.U32 if len(regs) > 1 else Kind.U16
+    return RegisterSensor(key=key, name=name, registers=regs, kind=kind, scale=0.1,
+                          unit=UnitOfTime.HOURS, device_class=SensorDeviceClass.DURATION,
+                          state_class=TOTAL, precision=1, **kw)
+
+
 def energy(key, name, *regs, **kw) -> RegisterSensor:
     kind = Kind.U32 if len(regs) > 1 else Kind.U16
     return RegisterSensor(key=key, name=name, registers=regs, kind=kind, scale=0.1,
@@ -276,6 +303,14 @@ def temperature(key, name, reg, **kw) -> RegisterSensor:
 def hertz(key, name, reg, **kw) -> RegisterSensor:
     return RegisterSensor(key=key, name=name, registers=(reg,), scale=0.01, unit=HZ,
                           device_class=F, precision=2, **kw)
+
+
+def phases(make, key: str, name: str, first: int, **kw) -> tuple[RegisterSensor, ...]:
+    """One sensor per phase, from three consecutive registers."""
+    return tuple(
+        make(key.format(n), name.format(n), first + n - 1, **kw)
+        for n in (1, 2, 3)
+    )
 
 
 def status(state: int, alarm: tuple[int, ...], fault: tuple[int, ...],
@@ -316,6 +351,7 @@ IDENTITY = (
     RegisterSensor(key="device_type", name="Device type", registers=(REG_DEVICE_TYPE,),
                    kind=Kind.DEVICE_TYPE, state_class=None, diagnostic=True),
     RegisterSensor(key="protocol_version", name="Protocol version", registers=(REG_PROTOCOL,),
+                   kind=Kind.HEX,
                    state_class=None, diagnostic=True, enabled=False),
 )
 
@@ -559,7 +595,9 @@ SINGLE_PHASE = Family(
         energy("today_production", "Today PV production", 0x006C),
         energy("total_production", "Total PV production", 0x0060, 0x0061),
         *bms(0x0138),
+        rated(0x0010, 0x0011),
     ),
+    flags=(RegisterFlag(key="grid_relay", name="Grid relay", register=0x00C2, bit=0),),
     rated_power=(0x0010, 0x0011),
     mppt_register=0x0012,
     unit_checks=(
@@ -617,12 +655,25 @@ THREE_PHASE_OVERRIDES: dict[str, dict[str, Any]] = {
 }
 
 
+# Settings the single phase map does not have, at their own addresses. Max solar
+# power goes above the rated power (11000 W on a 10 kW unit, whose PV input takes
+# up to 13000 W), so it is bounded by the range ha-solarman uses for these models.
+THREE_PHASE_EXTRA_CONTROLS = (
+    Control(key="solar_sell", name="Solar sell", register=0x0091,
+            platform=ControlPlatform.SWITCH),
+    Control(key="max_solar_power", name="Max solar power", register=0x0154,
+            platform=ControlPlatform.NUMBER, maximum=32000, step=10, unit=W,
+            device_class="power"),
+)
+
+
 def three_phase_controls() -> tuple[Control, ...]:
+    """The single phase controls at their three phase addresses, all enabled."""
     return tuple(
-        replace(c, register=c.register - THREE_PHASE_OFFSET,
+        replace(c, register=c.register - THREE_PHASE_OFFSET, enabled=True,
                 **THREE_PHASE_OVERRIDES.get(c.key, {}))
         for c in SINGLE_PHASE.controls
-    )
+    ) + THREE_PHASE_EXTRA_CONTROLS
 
 
 # SUN-*K-SG0*LP3, SUN-*K-SG0*HP3
@@ -630,7 +681,7 @@ THREE_PHASE = Family(
     key="three_phase_hybrid",
     name="Three phase hybrid",
     codes=frozenset({0x0005, 0x0500}),
-    support=Support.EXPERIMENTAL,
+    support=Support.SUPPORTED,
     has_battery_modules=True,
     sensors=(
         *IDENTITY,
@@ -646,19 +697,32 @@ THREE_PHASE = Family(
         volts("grid_l1_voltage", "Grid L1 voltage", 0x0256),
         volts("grid_l2_voltage", "Grid L2 voltage", 0x0257),
         volts("grid_l3_voltage", "Grid L3 voltage", 0x0258),
+        # Measured at the inverter's grid port, not at the meter: it is the grid
+        # current the Deye Cloud shows, and reads several amps while grid power is
+        # near 0 W.
+        *phases(amps, "inverter_grid_port_l{}_current", "Inverter grid port L{} current",
+                0x0262),
+        *phases(amps, "external_ct_l{}_current", "External CT L{} current", 0x0265),
         hertz("grid_frequency", "Grid frequency", 0x0261),
-        power("grid_power", "Grid power", 0x0271, 0x02B2, kind=Kind.S32_LOW_SIGNED),
-        power("grid_l1_power", "Grid L1 power", 0x026E, 0x02AF, kind=Kind.S32_LOW_SIGNED,
-              enabled=False),
-        power("grid_l2_power", "Grid L2 power", 0x026F, 0x02B0, kind=Kind.S32_LOW_SIGNED,
-              enabled=False),
-        power("grid_l3_power", "Grid L3 power", 0x0270, 0x02B1, kind=Kind.S32_LOW_SIGNED,
-              enabled=False),
-        power("external_ct_power", "External CT power", 0x026B, 0x02C4, kind=Kind.S32,
-              enabled=False),
-        power("inverter_power", "Inverter power", 0x027C, 0x02B6, kind=Kind.S32),
-        power("ups_power", "UPS power", 0x0283, 0x02BB, kind=Kind.S32),
-        power("load_power", "Load power", 0x028D, 0x0293, kind=Kind.S32),
+        # Totals are read from their original 16-bit registers: signed up to 32,767 W,
+        # load and UPS unsigned up to 65,535 W. Protocol V104 added high words for
+        # larger ones, but near 0 W the two words can disagree in sign and the reading
+        # jumps by 65,536 W.
+        power("grid_power", "Grid power", 0x0271),
+        power("grid_l1_power", "Grid L1 power", 0x026E, enabled=False),
+        power("grid_l2_power", "Grid L2 power", 0x026F, enabled=False),
+        power("grid_l3_power", "Grid L3 power", 0x0270, enabled=False),
+        power("external_ct_power", "External CT power", 0x026B, enabled=False),
+        *phases(power, "external_ct_l{}_power", "External CT L{} power", 0x0268),
+        power("inverter_power", "Inverter power", 0x027C),
+        *phases(volts, "inverter_l{}_voltage", "Inverter L{} voltage", 0x0273),
+        *phases(amps, "inverter_l{}_current", "Inverter L{} current", 0x0276),
+        *phases(power, "inverter_l{}_power", "Inverter L{} power", 0x0279),
+        power("ups_power", "UPS power", 0x0283, kind=Kind.U16),
+        *phases(power, "ups_l{}_power", "UPS L{} power", 0x0280, kind=Kind.U16),
+        power("load_power", "Load power", 0x028D, kind=Kind.U16),
+        *phases(volts, "load_l{}_voltage", "Load L{} voltage", 0x0284),
+        *phases(power, "load_l{}_power", "Load L{} power", 0x028A, kind=Kind.U16),
         hertz("load_frequency", "Load frequency", 0x028F, enabled=False),
         power("pv1_power", "PV1 power", 0x02A0, kind=Kind.U16),
         power("pv2_power", "PV2 power", 0x02A1, kind=Kind.U16),
@@ -682,16 +746,34 @@ THREE_PHASE = Family(
         energy("total_load", "Total load consumption", 0x020F, 0x0210),
         energy("today_production", "Today PV production", 0x0211),
         energy("total_production", "Total PV production", 0x0216, 0x0217),
+        RegisterSensor(key="grid_power_factor", name="Grid power factor",
+                       registers=(0x026D,), kind=Kind.S16, scale=0.1, unit=PERCENTAGE,
+                       device_class=SensorDeviceClass.POWER_FACTOR, precision=1,
+                       enabled=False),
+        power("generator_power", "Generator power", 0x029B, enabled=False),
+        energy("today_generator_production", "Today generator production", 0x0218,
+               enabled=False),
+        energy("total_generator_production", "Total generator production", 0x0219, 0x021A,
+               enabled=False),
+        hours("today_generator_runtime", "Today generator runtime", 0x021B, enabled=False),
+        hours("total_generator_runtime", "Total generator runtime", 0x0200, 0x0201,
+              enabled=False),
         *bms(0x00D2),
+        rated(0x0014, 0x0015),
     ),
+    # Deye's AC relay status word; bit 2 is the grid relay.
+    flags=(RegisterFlag(key="grid_relay", name="Grid relay", register=0x0228, bit=2),),
     rated_power=(0x0014, 0x0015),
     controls=three_phase_controls(),
 )
 
 # High voltage models scale the time of use power (x10) and voltage (x0.1)
 # differently, so they stay read only until one confirms the map.
-THREE_PHASE_HV = replace(THREE_PHASE, codes=frozenset({0x0006}), controls=(),
-                         rated_power=())
+THREE_PHASE_HV = replace(
+    THREE_PHASE, codes=frozenset({0x0006}), controls=(), rated_power=(),
+    sensors=tuple(s for s in THREE_PHASE.sensors if s.key != "rated_power"),
+    support=Support.EXPERIMENTAL,
+)
 
 
 KNOWN_UNSUPPORTED = {

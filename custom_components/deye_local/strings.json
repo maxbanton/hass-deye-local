@@ -43,6 +43,15 @@
     }
   },
   "entity": {
+    "binary_sensor": {
+      "grid_relay": {
+        "name": "Grid relay",
+        "state": {
+          "off": "Open",
+          "on": "Closed"
+        }
+      }
+    },
     "number": {
       "grid_charge_current": {
         "name": "Grid charge current"
@@ -64,6 +73,9 @@
       },
       "max_sell_power": {
         "name": "Max sell power"
+      },
+      "max_solar_power": {
+        "name": "Max solar power"
       },
       "restart_soc": {
         "name": "Battery restart SOC"
@@ -178,6 +190,24 @@
       "device_type": {
         "name": "Device type"
       },
+      "external_ct_l1_current": {
+        "name": "External CT L1 current"
+      },
+      "external_ct_l1_power": {
+        "name": "External CT L1 power"
+      },
+      "external_ct_l2_current": {
+        "name": "External CT L2 current"
+      },
+      "external_ct_l2_power": {
+        "name": "External CT L2 power"
+      },
+      "external_ct_l3_current": {
+        "name": "External CT L3 current"
+      },
+      "external_ct_l3_power": {
+        "name": "External CT L3 power"
+      },
       "external_ct_power": {
         "name": "External CT power"
       },
@@ -214,17 +244,74 @@
       "grid_power": {
         "name": "Grid power"
       },
+      "grid_power_factor": {
+        "name": "Grid power factor"
+      },
       "grid_voltage": {
         "name": "Grid voltage"
       },
       "inverter_clock": {
         "name": "Inverter clock"
       },
+      "inverter_grid_port_l1_current": {
+        "name": "Inverter grid port L1 current"
+      },
+      "inverter_grid_port_l2_current": {
+        "name": "Inverter grid port L2 current"
+      },
+      "inverter_grid_port_l3_current": {
+        "name": "Inverter grid port L3 current"
+      },
+      "inverter_l1_current": {
+        "name": "Inverter L1 current"
+      },
+      "inverter_l1_power": {
+        "name": "Inverter L1 power"
+      },
+      "inverter_l1_voltage": {
+        "name": "Inverter L1 voltage"
+      },
+      "inverter_l2_current": {
+        "name": "Inverter L2 current"
+      },
+      "inverter_l2_power": {
+        "name": "Inverter L2 power"
+      },
+      "inverter_l2_voltage": {
+        "name": "Inverter L2 voltage"
+      },
+      "inverter_l3_current": {
+        "name": "Inverter L3 current"
+      },
+      "inverter_l3_power": {
+        "name": "Inverter L3 power"
+      },
+      "inverter_l3_voltage": {
+        "name": "Inverter L3 voltage"
+      },
       "inverter_power": {
         "name": "Inverter power"
       },
       "load_frequency": {
         "name": "Load frequency"
+      },
+      "load_l1_power": {
+        "name": "Load L1 power"
+      },
+      "load_l1_voltage": {
+        "name": "Load L1 voltage"
+      },
+      "load_l2_power": {
+        "name": "Load L2 power"
+      },
+      "load_l2_voltage": {
+        "name": "Load L2 voltage"
+      },
+      "load_l3_power": {
+        "name": "Load L3 power"
+      },
+      "load_l3_voltage": {
+        "name": "Load L3 voltage"
       },
       "load_power": {
         "name": "Load power"
@@ -292,6 +379,9 @@
       "pv4_voltage": {
         "name": "PV4 voltage"
       },
+      "rated_power": {
+        "name": "Rated power"
+      },
       "signal_strength": {
         "name": "Signal strength"
       },
@@ -309,6 +399,12 @@
       },
       "today_battery_discharge": {
         "name": "Today battery discharge"
+      },
+      "today_generator_production": {
+        "name": "Today generator production"
+      },
+      "today_generator_runtime": {
+        "name": "Today generator runtime"
       },
       "today_grid_export": {
         "name": "Today grid export"
@@ -328,6 +424,12 @@
       "total_battery_discharge": {
         "name": "Total battery discharge"
       },
+      "total_generator_production": {
+        "name": "Total generator production"
+      },
+      "total_generator_runtime": {
+        "name": "Total generator runtime"
+      },
       "total_grid_export": {
         "name": "Total grid export"
       },
@@ -339,6 +441,15 @@
       },
       "total_production": {
         "name": "Total PV production"
+      },
+      "ups_l1_power": {
+        "name": "UPS L1 power"
+      },
+      "ups_l2_power": {
+        "name": "UPS L2 power"
+      },
+      "ups_l3_power": {
+        "name": "UPS L3 power"
       },
       "ups_power": {
         "name": "UPS power"
@@ -356,6 +467,9 @@
       },
       "grid_peak_shaving": {
         "name": "Grid peak shaving"
+      },
+      "solar_sell": {
+        "name": "Solar sell"
       },
       "time_of_use": {
         "name": "Time of use"
@@ -403,10 +517,6 @@
     }
   },
   "issues": {
-    "experimental": {
-      "title": "{model} support is experimental",
-      "description": "The register map for this inverter family has not been confirmed on real hardware yet. If any values or settings look wrong, download the diagnostics from the device page (they include a register dump) and open an issue at {url}."
-    },
     "unsupported": {
       "title": "{model} is not supported yet",
       "description": "Deye Local does not have a register map for this inverter yet, so only its identity is shown. Download the diagnostics from the device page (they include a register dump) and open an issue at {url} to help add it."

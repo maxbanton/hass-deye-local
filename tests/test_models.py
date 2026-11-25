@@ -81,27 +81,45 @@ def test_32_bit_values_are_low_word_first():
     assert decode(sensor, {0x0048: 0x0001, 0x0049: 0x0001}) == pytest.approx(6553.7)
 
 
-def test_signed_32_bit():
-    load = next(s for s in THREE_PHASE.sensors if s.key == "load_power")
-    assert load.kind is Kind.S32
-    assert decode(load, {0x028D: 0xFFFF, 0x0293: 0xFFFF}) == -1
+THREE_PHASE_TOTALS = (
+    "grid_power", "grid_l1_power", "grid_l2_power", "grid_l3_power", "external_ct_power",
+    "inverter_power", "ups_power", "load_power", "generator_power",
+)
+# Upper halves protocol V104 added to the totals for units above 32,767 W.
+THREE_PHASE_HIGH_WORDS = {
+    0x0293, 0x029F, 0x02AF, 0x02B0, 0x02B1, 0x02B2, 0x02B6, 0x02BB, 0x02C4,
+}
+
+
+UNSIGNED_TOTALS = ("ups_power", "load_power")
+
+
+def test_three_phase_totals_read_one_register():
+    sensors = {s.key: s for s in THREE_PHASE.sensors}
+    for key in THREE_PHASE_TOTALS:
+        expected = Kind.U16 if key in UNSIGNED_TOTALS else Kind.S16
+        assert sensors[key].kind is expected, key
+        assert len(sensors[key].registers) == 1, key
+    for part in ("ups", "load"):
+        assert all(sensors[f"{part}_l{n}_power"].kind is Kind.U16 for n in (1, 2, 3)), part
+    assert not THREE_PHASE_HIGH_WORDS & set(THREE_PHASE.registers)
 
 
 @pytest.mark.parametrize(
-    "low,high,watts",
-    [
-        (0x000D, 0x0000, 13),
-        (0xFFD3, 0xFFFF, -45),
-        # The high word still holds the other sign near 0 W.
-        (0xFFD3, 0x0000, -45),
-        (0x000D, 0xFFFF, 13),
-        (0x86A0, 0x0001, 100000),
-        (0x7960, 0xFFFE, -100000),
-    ],
+    "word,watts",
+    [(0x000D, 13), (0xFFD3, -45), (0xFFDF, -33), (0x000E, 14), (0x7FFF, 32767), (0x8000, -32768)],
 )
-def test_grid_power_trusts_the_sign_of_the_low_word(low, high, watts):
-    grid = next(s for s in THREE_PHASE.sensors if s.key == "grid_power")
-    assert decode(grid, {0x0271: low, 0x02B2: high}) == watts
+@pytest.mark.parametrize("key", [k for k in THREE_PHASE_TOTALS if k not in UNSIGNED_TOTALS])
+def test_three_phase_signed_totals(key, word, watts):
+    sensor = next(s for s in THREE_PHASE.sensors if s.key == key)
+    assert decode(sensor, {sensor.registers[0]: word}) == watts
+
+
+@pytest.mark.parametrize("word,watts", [(0x0037, 55), (0x8000, 32768), (0xBB80, 48000)])
+@pytest.mark.parametrize("key", UNSIGNED_TOTALS)
+def test_three_phase_load_and_ups_are_unsigned(key, word, watts):
+    sensor = next(s for s in THREE_PHASE.sensors if s.key == key)
+    assert decode(sensor, {sensor.registers[0]: word}) == watts
 
 
 def test_low_voltage_three_phase_has_the_single_phase_settings_lower():
@@ -110,7 +128,7 @@ def test_low_voltage_three_phase_has_the_single_phase_settings_lower():
     low_voltage, high_voltage = family_for(0x0005), family_for(0x0006)
     single = {c.key: c for c in SINGLE_PHASE.controls}
     three = {c.key: c for c in low_voltage.controls}
-    assert three.keys() == single.keys()
+    assert three.keys() == single.keys() | {"solar_sell", "max_solar_power"}
     assert all(three[k].register == single[k].register - 0x66 for k in single)
     assert three["time_of_use"].register == 0x0092
     assert three["tou1_soc"].register == 0x00A6
@@ -120,7 +138,53 @@ def test_low_voltage_three_phase_has_the_single_phase_settings_lower():
     assert three["grid_charge_current"].maximum == 350
     assert high_voltage.controls == ()
     assert high_voltage.key == low_voltage.key
-    assert high_voltage.sensors == low_voltage.sensors
+    assert {s.key for s in high_voltage.sensors} == {s.key for s in low_voltage.sensors} - {
+        "rated_power"
+    }
+    assert all(c.enabled for c in low_voltage.controls)
+    assert three["solar_sell"].register == 0x0091
+    assert three["max_solar_power"].register == 0x0154
+
+
+# Read from a SUN-10K-SG04LP3-EU on 2026-11-18, a minute apart from the Deye
+# Cloud values in the comments.
+THREE_PHASE_PER_PHASE = {
+    0x0262: 73, 0x0263: 106, 0x0264: 535, 0x0265: 93, 0x0266: 111, 0x0267: 166,
+    0x0268: 4, 0x0269: 3, 0x026A: 5, 0x026B: 12,
+    0x0273: 2349, 0x0274: 2337, 0x0275: 2346,
+    0x0276: 50, 0x0277: 90, 0x0278: 530,
+    0x0279: 157, 0x027A: 243, 0x027B: 1264, 0x027C: 1664,
+    0x0280: 14, 0x0281: 17, 0x0282: 24, 0x0283: 55,
+    0x0284: 2335, 0x0285: 2340, 0x0286: 2332,
+    0x028A: 161, 0x028B: 243, 0x028C: 1265, 0x028D: 1669,
+}
+
+
+def test_three_phase_per_phase_readings():
+    values = {
+        s.key: decode(s, THREE_PHASE_PER_PHASE)
+        for s in THREE_PHASE.sensors
+        if all(r in THREE_PHASE_PER_PHASE for r in s.registers)
+    }
+    # Cloud: grid 0.74 A, inverter 235.1 V 0.50 A 161 W, UPS 233.5 V, CT 2 W.
+    assert [values[f"inverter_grid_port_l{n}_current"] for n in (1, 2, 3)] == [0.73, 1.06, 5.35]
+    assert [values[f"external_ct_l{n}_current"] for n in (1, 2, 3)] == [0.93, 1.11, 1.66]
+    assert [values[f"inverter_l{n}_voltage"] for n in (1, 2, 3)] == [234.9, 233.7, 234.6]
+    assert [values[f"inverter_l{n}_current"] for n in (1, 2, 3)] == [0.5, 0.9, 5.3]
+    assert [values[f"load_l{n}_voltage"] for n in (1, 2, 3)] == [233.5, 234.0, 233.2]
+    for part in ("external_ct", "inverter", "ups", "load"):
+        phases = [values[f"{part}_l{n}_power"] for n in (1, 2, 3)]
+        assert sum(phases) == values[f"{part}_power"], part
+
+
+def test_three_phase_per_phase_sensors_are_enabled_by_default():
+    parts = ("inverter_grid_port_l{}_current", "external_ct_l{}_current", "external_ct_l{}_power",
+             "inverter_l{}_voltage", "inverter_l{}_current", "inverter_l{}_power",
+             "ups_l{}_power", "load_l{}_voltage", "load_l{}_power")
+    keys = {part.format(n) for part in parts for n in (1, 2, 3)}
+    sensors = {s.key: s for s in THREE_PHASE.sensors}
+    assert keys <= sensors.keys()
+    assert all(sensors[key].enabled for key in keys)
 
 
 @pytest.mark.parametrize(
@@ -128,7 +192,7 @@ def test_low_voltage_three_phase_has_the_single_phase_settings_lower():
     [
         (0x0003, "single_phase_hybrid", Support.SUPPORTED),
         (0x0300, "single_phase_hybrid", Support.SUPPORTED),
-        (0x0005, "three_phase_hybrid", Support.EXPERIMENTAL),
+        (0x0005, "three_phase_hybrid", Support.SUPPORTED),
         (0x0006, "three_phase_hybrid", Support.EXPERIMENTAL),
         (0x0002, "unsupported", Support.UNSUPPORTED),
         (0x1234, "unsupported", Support.UNSUPPORTED),
@@ -246,3 +310,48 @@ def test_pv_strings_follow_the_mppt_count():
     assert not has_string(SINGLE_PHASE, SENSORS["pv4_power"], SNAPSHOT_10K)
     assert has_string(SINGLE_PHASE, SENSORS["pv1_power"], {})
     assert decode(SENSORS["pv3_voltage"], SNAPSHOT_10K) == pytest.approx(3.8)
+
+
+# Read from the same SUN-10K-SG04LP3-EU, and from a SUN-12K-SG05LP3-EU, whose
+# Deye Cloud pages showed 10 kW and 12 kW.
+THREE_PHASE_10K = {
+    0x0014: 34464, 0x0015: 1, 0x026D: 65476, 0x0200: 9, 0x0201: 0,
+    0x0218: 0, 0x0219: 0, 0x021A: 0, 0x021B: 0, 0x0228: 5, 0x029B: 0,
+}
+THREE_PHASE_12K = {0x0014: 54464, 0x0015: 1, 0x026D: 998, 0x0228: 5}
+
+
+def test_three_phase_status_readings():
+    values = {
+        s.key: decode(s, THREE_PHASE_10K)
+        for s in THREE_PHASE.sensors
+        if all(r in THREE_PHASE_10K for r in s.registers)
+    }
+    assert values["rated_power"] == 10000
+    assert values["grid_power_factor"] == -6.0
+    assert values["total_generator_runtime"] == 0.9
+    assert values["today_generator_runtime"] == 0
+    assert values["generator_power"] == 0
+    sensors = {s.key: s for s in THREE_PHASE.sensors}
+    assert decode(sensors["rated_power"], THREE_PHASE_12K) == 12000
+    assert decode(sensors["grid_power_factor"], THREE_PHASE_12K) == 99.8
+
+
+def test_fixed_values_are_read_with_the_settings():
+    fixed = {r for s in THREE_PHASE.sensors if s.setting for r in s.registers}
+    assert fixed == {0x0014, 0x0015}
+    assert fixed <= THREE_PHASE.setting_registers
+    assert not fixed & THREE_PHASE.registers
+    assert 0x0228 in THREE_PHASE.registers
+
+
+def test_single_phase_rated_power():
+    from .snapshot import SETTINGS
+
+    rated = next(s for s in SINGLE_PHASE.sensors if s.key == "rated_power")
+    assert decode(rated, SETTINGS) == 6000
+
+
+def test_protocol_version_reads_as_in_the_deye_app():
+    protocol = next(s for s in SINGLE_PHASE.sensors if s.key == "protocol_version")
+    assert decode(protocol, {0x0002: 0x0201}) == "0201"

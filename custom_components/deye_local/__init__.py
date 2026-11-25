@@ -14,6 +14,7 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import ConfigEntryNotReady
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import device_registry as dr
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers import issue_registry as ir
 from homeassistant.helpers.typing import ConfigType
 
@@ -32,6 +33,7 @@ from .models import Support, family_for
 from .services import async_setup_services
 
 PLATFORMS = [
+    Platform.BINARY_SENSOR,
     Platform.NUMBER,
     Platform.SELECT,
     Platform.SENSOR,
@@ -53,6 +55,26 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
 
 def _issue_id(entry: ConfigEntry) -> str:
     return f"model_{entry.entry_id}"
+
+
+@callback
+def _enable_default_controls(hass: HomeAssistant, coordinator: DeyeLocalCoordinator) -> None:
+    """Enable controls an older version registered as disabled by default.
+
+    Home Assistant applies a default only when it first registers an entity, so
+    a control that became enabled by default would stay off for existing users.
+    Controls the user disabled are left alone.
+    """
+    registry = er.async_get(hass)
+    prefix = f"{inverter_identifier(coordinator)}_"
+    enabled = {control.key for control in coordinator.family.controls if control.enabled}
+    for entity in er.async_entries_for_config_entry(registry, coordinator.config_entry.entry_id):
+        if (
+            entity.disabled_by is er.RegistryEntryDisabler.INTEGRATION
+            and entity.unique_id.startswith(prefix)
+            and entity.unique_id.removeprefix(prefix) in enabled
+        ):
+            registry.async_update_entity(entity.entity_id, disabled_by=None)
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: DeyeLocalConfigEntry) -> bool:
@@ -99,7 +121,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: DeyeLocalConfigEntry) ->
         )
     )
 
-    if family.support is Support.SUPPORTED:
+    # Only a family without entities gets a repair issue: it explains the empty device.
+    if family.support is not Support.UNSUPPORTED:
         ir.async_delete_issue(hass, DOMAIN, _issue_id(entry))
     else:
         ir.async_create_issue(
@@ -112,6 +135,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: DeyeLocalConfigEntry) ->
             translation_placeholders={"model": family.name, "url": ISSUES_URL},
         )
 
+    _enable_default_controls(hass, coordinator)
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     options = dict(entry.options)
 
