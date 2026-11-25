@@ -1,4 +1,5 @@
 """Make the repo root importable so tests can import custom_components.*"""
+
 import os
 import sys
 
