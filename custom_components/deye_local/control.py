@@ -1,4 +1,5 @@
 """Base for entities that change inverter settings."""
+
 from __future__ import annotations
 
 import re
@@ -10,9 +11,7 @@ from .entity import DeyeLocalEntity
 from .models import Control, ControlPlatform, control_value
 
 
-def controls_for(
-    coordinator: DeyeLocalCoordinator, platform: ControlPlatform
-) -> list[Control]:
+def controls_for(coordinator: DeyeLocalCoordinator, platform: ControlPlatform) -> list[Control]:
     return [c for c in coordinator.family.controls if c.platform is platform]
 
 

@@ -1,4 +1,5 @@
 """The dashboard cards: served by the integration and loaded on the dashboards."""
+
 from __future__ import annotations
 
 from types import SimpleNamespace
@@ -85,9 +86,7 @@ async def test_card_is_added_to_the_dashboard_resources(hass: HomeAssistant, res
     assert resources.async_items()[0]["type"] == "module"
 
 
-async def test_update_moves_the_resource_to_the_new_version(
-    hass: HomeAssistant, resources
-) -> None:
+async def test_update_moves_the_resource_to_the_new_version(hass: HomeAssistant, resources) -> None:
     await resources.async_create_item({"res_type": "module", "url": "/local/other-card.js"})
     await resources.async_create_item({"res_type": "module", "url": f"{CARD_URL}?v=0.1.0"})
     await resources.async_create_item({"res_type": "js", "url": CARD_URL})
@@ -102,9 +101,7 @@ async def test_yaml_dashboards_load_the_card_with_the_page(hass: HomeAssistant) 
     add_url.assert_called_once_with(hass, f"{CARD_URL}?v={await _version(hass)}")
 
 
-async def test_removing_the_last_entry_removes_the_resource(
-    hass: HomeAssistant, resources
-) -> None:
+async def test_removing_the_last_entry_removes_the_resource(hass: HomeAssistant, resources) -> None:
     entry = await _setup(hass)
     other = MockConfigEntry(domain=DOMAIN, unique_id="AA:BB:CC:DD:EE:FF", data={})
     other.add_to_hass(hass)
@@ -120,4 +117,3 @@ async def test_a_new_entry_restores_a_removed_resource(hass: HomeAssistant, reso
     assert _urls(resources) == []
     await _setup(hass)
     assert _urls(resources) == [f"{CARD_URL}?v={await _version(hass)}"]
-

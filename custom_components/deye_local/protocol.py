@@ -10,6 +10,7 @@ The logger speaks ASCII over BLE:
 Replies can arrive split over several notifications and without a line ending,
 so completeness is judged from the content rather than a terminator.
 """
+
 from __future__ import annotations
 
 import re
@@ -93,7 +94,7 @@ def parse_handshake(buffer: str) -> str:
     match = _HANDSHAKE_RE.search(buffer)
     if match is None:
         raise ProtocolError(f"unexpected handshake reply {buffer.strip()!r}")
-    return match.group(0)[len(_OK):]
+    return match.group(0)[len(_OK) :]
 
 
 def _expected_hex_length(count: int) -> int:

@@ -1,4 +1,5 @@
 """Sensors decoded from the inverter's registers."""
+
 from __future__ import annotations
 
 from typing import Any

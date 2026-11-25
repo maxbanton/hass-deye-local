@@ -1,4 +1,5 @@
 """Polling coordinator for one data logger."""
+
 from __future__ import annotations
 
 import asyncio
@@ -143,7 +144,8 @@ class DeyeLocalCoordinator(DataUpdateCoordinator[dict[int, int]]):
             if count >= UNIT_CHECK_POLLS and verdict != (group in coarse):
                 _LOGGER.info(
                     "Inverter reports %s in %s units",
-                    group.value.replace("_", " "), "coarse" if verdict else "documented",
+                    group.value.replace("_", " "),
+                    "coarse" if verdict else "documented",
                 )
                 if verdict:
                     coarse.add(group)
@@ -197,7 +199,9 @@ class DeyeLocalCoordinator(DataUpdateCoordinator[dict[int, int]]):
             if serial in slots:
                 _LOGGER.warning(
                     "Battery modules in slots %d and %d report the same serial %s",
-                    slots[serial] + 1, index + 1, serial,
+                    slots[serial] + 1,
+                    index + 1,
+                    serial,
                 )
                 continue
             slots[serial] = index
@@ -227,7 +231,10 @@ class DeyeLocalCoordinator(DataUpdateCoordinator[dict[int, int]]):
                 if target != current:
                     _LOGGER.debug(
                         "Writing %s: register %#06x %d -> %d",
-                        control.key, register, current, target,
+                        control.key,
+                        register,
+                        current,
+                        target,
                     )
                     await self.transport.async_write(register, [target])
                     current = await self._async_read_back(register, target)
@@ -271,7 +278,8 @@ class DeyeLocalCoordinator(DataUpdateCoordinator[dict[int, int]]):
                 changed = sorted(r for r, value in targets.items() if current[r] != value)
                 if changed:
                     _LOGGER.debug(
-                        "Writing %s: %s", name,
+                        "Writing %s: %s",
+                        name,
                         {f"{r:#06x}": (current[r], targets[r]) for r in changed},
                     )
                     await self._async_write_frames(changed, targets, current, columns)
@@ -317,7 +325,8 @@ class DeyeLocalCoordinator(DataUpdateCoordinator[dict[int, int]]):
                 # logger may have taken after all is harmless.
                 _LOGGER.debug(
                     "No reply to a %d register write (%s), writing column by column",
-                    changed[-1] - changed[0] + 1, err,
+                    changed[-1] - changed[0] + 1,
+                    err,
                 )
                 self._split_writes = True
                 await self.transport.async_connect()

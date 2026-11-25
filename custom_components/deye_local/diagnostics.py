@@ -3,6 +3,7 @@
 Serial numbers and the logger's address are redacted, also where they appear as
 raw register values, because users are asked to share this file publicly.
 """
+
 from __future__ import annotations
 
 import re

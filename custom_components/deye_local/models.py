@@ -3,6 +3,7 @@
 Register 0 of every Deye inverter reports its family, and each family has its
 own layout. Multi-register values are stored low word first.
 """
+
 from __future__ import annotations
 
 from collections.abc import Callable, Collection
@@ -180,8 +181,7 @@ class Family:
         mppt = {self.mppt_register} if self.mppt_register is not None else set()
         fixed = {reg for sensor in self.sensors if sensor.setting for reg in sensor.registers}
         return (
-            {control.register for control in self.controls}
-            | set(self.rated_power) | mppt | fixed
+            {control.register for control in self.controls} | set(self.rated_power) | mppt | fixed
         )
 
 
@@ -196,9 +196,7 @@ def _bits(value: int) -> list[int]:
     return [bit for bit in range(value.bit_length()) if value >> bit & 1]
 
 
-def decode(
-    sensor: RegisterSensor, regs: dict[int, int], coarse: Collection[Coarse] = ()
-) -> Any:
+def decode(sensor: RegisterSensor, regs: dict[int, int], coarse: Collection[Coarse] = ()) -> Any:
     scale = sensor.scale * 10 if sensor.coarse in coarse else sensor.scale
     try:
         raw = _words(regs, sensor.registers)
@@ -262,68 +260,139 @@ TOTAL = SensorStateClass.TOTAL_INCREASING
 
 
 def power(key, name, *regs, kind=Kind.S16, **kw) -> RegisterSensor:
-    return RegisterSensor(key=key, name=name, registers=regs, kind=kind, unit=W,
-                          device_class=P, **kw)
+    return RegisterSensor(
+        key=key, name=name, registers=regs, kind=kind, unit=W, device_class=P, **kw
+    )
 
 
 def rated(*regs) -> RegisterSensor:
-    return RegisterSensor(key="rated_power", name="Rated power", registers=regs, kind=Kind.U32,
-                          scale=0.1, precision=0, unit=W, device_class=P, state_class=None,
-                          diagnostic=True, setting=True)
+    return RegisterSensor(
+        key="rated_power",
+        name="Rated power",
+        registers=regs,
+        kind=Kind.U32,
+        scale=0.1,
+        precision=0,
+        unit=W,
+        device_class=P,
+        state_class=None,
+        diagnostic=True,
+        setting=True,
+    )
 
 
 def hours(key, name, *regs, **kw) -> RegisterSensor:
     kind = Kind.U32 if len(regs) > 1 else Kind.U16
-    return RegisterSensor(key=key, name=name, registers=regs, kind=kind, scale=0.1,
-                          unit=UnitOfTime.HOURS, device_class=SensorDeviceClass.DURATION,
-                          state_class=TOTAL, precision=1, **kw)
+    return RegisterSensor(
+        key=key,
+        name=name,
+        registers=regs,
+        kind=kind,
+        scale=0.1,
+        unit=UnitOfTime.HOURS,
+        device_class=SensorDeviceClass.DURATION,
+        state_class=TOTAL,
+        precision=1,
+        **kw,
+    )
 
 
 def energy(key, name, *regs, **kw) -> RegisterSensor:
     kind = Kind.U32 if len(regs) > 1 else Kind.U16
-    return RegisterSensor(key=key, name=name, registers=regs, kind=kind, scale=0.1,
-                          unit=KWH, device_class=E, state_class=TOTAL, precision=1, **kw)
+    return RegisterSensor(
+        key=key,
+        name=name,
+        registers=regs,
+        kind=kind,
+        scale=0.1,
+        unit=KWH,
+        device_class=E,
+        state_class=TOTAL,
+        precision=1,
+        **kw,
+    )
 
 
 def volts(key, name, reg, scale=0.1, **kw) -> RegisterSensor:
-    return RegisterSensor(key=key, name=name, registers=(reg,), scale=scale, unit=VOLT,
-                          device_class=V, precision=2 if scale < 0.1 else 1, **kw)
+    return RegisterSensor(
+        key=key,
+        name=name,
+        registers=(reg,),
+        scale=scale,
+        unit=VOLT,
+        device_class=V,
+        precision=2 if scale < 0.1 else 1,
+        **kw,
+    )
 
 
 def amps(key, name, reg, scale=0.01, kind=Kind.S16, **kw) -> RegisterSensor:
-    return RegisterSensor(key=key, name=name, registers=(reg,), kind=kind, scale=scale,
-                          unit=AMP, device_class=A, precision=2 if scale < 0.1 else 1, **kw)
+    return RegisterSensor(
+        key=key,
+        name=name,
+        registers=(reg,),
+        kind=kind,
+        scale=scale,
+        unit=AMP,
+        device_class=A,
+        precision=2 if scale < 0.1 else 1,
+        **kw,
+    )
 
 
 def temperature(key, name, reg, **kw) -> RegisterSensor:
-    return RegisterSensor(key=key, name=name, registers=(reg,), kind=Kind.S16, scale=0.1,
-                          offset=1000, unit=DEG, device_class=T, precision=1, **kw)
+    return RegisterSensor(
+        key=key,
+        name=name,
+        registers=(reg,),
+        kind=Kind.S16,
+        scale=0.1,
+        offset=1000,
+        unit=DEG,
+        device_class=T,
+        precision=1,
+        **kw,
+    )
 
 
 def hertz(key, name, reg, **kw) -> RegisterSensor:
-    return RegisterSensor(key=key, name=name, registers=(reg,), scale=0.01, unit=HZ,
-                          device_class=F, precision=2, **kw)
+    return RegisterSensor(
+        key=key, name=name, registers=(reg,), scale=0.01, unit=HZ, device_class=F, precision=2, **kw
+    )
 
 
 def phases(make, key: str, name: str, first: int, **kw) -> tuple[RegisterSensor, ...]:
     """One sensor per phase, from three consecutive registers."""
-    return tuple(
-        make(key.format(n), name.format(n), first + n - 1, **kw)
-        for n in (1, 2, 3)
-    )
+    return tuple(make(key.format(n), name.format(n), first + n - 1, **kw) for n in (1, 2, 3))
 
 
-def status(state: int, alarm: tuple[int, ...], fault: tuple[int, ...],
-           clock: tuple[int, ...]) -> tuple[RegisterSensor, ...]:
+def status(
+    state: int, alarm: tuple[int, ...], fault: tuple[int, ...], clock: tuple[int, ...]
+) -> tuple[RegisterSensor, ...]:
     return (
-        RegisterSensor(key="device_state", name="Device state", registers=(state,),
-                       kind=Kind.STATE, device_class=SensorDeviceClass.ENUM, state_class=None),
-        RegisterSensor(key="alarm", name="Alarm", registers=alarm, kind=Kind.ALARM,
-                       state_class=None),
-        RegisterSensor(key="fault", name="Fault", registers=fault, kind=Kind.FAULT,
-                       state_class=None),
-        RegisterSensor(key="inverter_clock", name="Inverter clock", registers=clock,
-                       kind=Kind.CLOCK, state_class=None, enabled=False, diagnostic=True),
+        RegisterSensor(
+            key="device_state",
+            name="Device state",
+            registers=(state,),
+            kind=Kind.STATE,
+            device_class=SensorDeviceClass.ENUM,
+            state_class=None,
+        ),
+        RegisterSensor(
+            key="alarm", name="Alarm", registers=alarm, kind=Kind.ALARM, state_class=None
+        ),
+        RegisterSensor(
+            key="fault", name="Fault", registers=fault, kind=Kind.FAULT, state_class=None
+        ),
+        RegisterSensor(
+            key="inverter_clock",
+            name="Inverter clock",
+            registers=clock,
+            kind=Kind.CLOCK,
+            state_class=None,
+            enabled=False,
+            diagnostic=True,
+        ),
     )
 
 
@@ -331,28 +400,63 @@ def bms(base: int, *, current_scale: float = 1) -> tuple[RegisterSensor, ...]:
     sensors = (
         volts("bms_charge_voltage", "BMS charge voltage", base, scale=0.01),
         volts("bms_discharge_voltage", "BMS discharge voltage", base + 1, scale=0.01),
-        amps("bms_charge_current_limit", "BMS charge current limit", base + 2, scale=1,
-             kind=Kind.U16),
-        amps("bms_discharge_current_limit", "BMS discharge current limit", base + 3, scale=1,
-             kind=Kind.U16),
-        RegisterSensor(key="bms_soc", name="BMS SOC", registers=(base + 4,), unit=PERCENTAGE,
-                       device_class=SensorDeviceClass.BATTERY),
+        amps(
+            "bms_charge_current_limit", "BMS charge current limit", base + 2, scale=1, kind=Kind.U16
+        ),
+        amps(
+            "bms_discharge_current_limit",
+            "BMS discharge current limit",
+            base + 3,
+            scale=1,
+            kind=Kind.U16,
+        ),
+        RegisterSensor(
+            key="bms_soc",
+            name="BMS SOC",
+            registers=(base + 4,),
+            unit=PERCENTAGE,
+            device_class=SensorDeviceClass.BATTERY,
+        ),
         volts("bms_voltage", "BMS voltage", base + 5, scale=0.01),
         amps("bms_current", "BMS current", base + 6, scale=current_scale),
-        amps("bms_max_charge_current", "BMS max charge current", base + 8, scale=1,
-             kind=Kind.U16, enabled=False),
-        amps("bms_max_discharge_current", "BMS max discharge current", base + 9, scale=1,
-             kind=Kind.U16, enabled=False),
+        amps(
+            "bms_max_charge_current",
+            "BMS max charge current",
+            base + 8,
+            scale=1,
+            kind=Kind.U16,
+            enabled=False,
+        ),
+        amps(
+            "bms_max_discharge_current",
+            "BMS max discharge current",
+            base + 9,
+            scale=1,
+            kind=Kind.U16,
+            enabled=False,
+        ),
     )
     return tuple(replace(sensor, enabled=False) for sensor in sensors)
 
 
 IDENTITY = (
-    RegisterSensor(key="device_type", name="Device type", registers=(REG_DEVICE_TYPE,),
-                   kind=Kind.DEVICE_TYPE, state_class=None, diagnostic=True),
-    RegisterSensor(key="protocol_version", name="Protocol version", registers=(REG_PROTOCOL,),
-                   kind=Kind.HEX,
-                   state_class=None, diagnostic=True, enabled=False),
+    RegisterSensor(
+        key="device_type",
+        name="Device type",
+        registers=(REG_DEVICE_TYPE,),
+        kind=Kind.DEVICE_TYPE,
+        state_class=None,
+        diagnostic=True,
+    ),
+    RegisterSensor(
+        key="protocol_version",
+        name="Protocol version",
+        registers=(REG_PROTOCOL,),
+        kind=Kind.HEX,
+        state_class=None,
+        diagnostic=True,
+        enabled=False,
+    ),
 )
 
 
@@ -373,23 +477,63 @@ def battery_sensors(index: int) -> tuple[RegisterSensor, ...]:
     base = BATTERY_BASE + index * BATTERY_STRIDE
     mv = UnitOfElectricPotential.MILLIVOLT
     return (
-        RegisterSensor(key="soc", name="SOC", registers=(base + 15,), scale=0.1,
-                       unit=PERCENTAGE, device_class=SensorDeviceClass.BATTERY, precision=1),
+        RegisterSensor(
+            key="soc",
+            name="SOC",
+            registers=(base + 15,),
+            scale=0.1,
+            unit=PERCENTAGE,
+            device_class=SensorDeviceClass.BATTERY,
+            precision=1,
+        ),
         volts("voltage", "Voltage", base + 8),
         amps("current", "Current", base + 9, scale=0.1),
         temperature("temperature", "Temperature", base + 10),
-        RegisterSensor(key="max_cell_voltage", name="Max cell voltage", registers=(base + 22,),
-                       scale=0.001, unit=VOLT, device_class=V, precision=3),
-        RegisterSensor(key="min_cell_voltage", name="Min cell voltage", registers=(base + 23,),
-                       scale=0.001, unit=VOLT, device_class=V, precision=3),
-        RegisterSensor(key="cell_voltage_difference", name="Cell voltage difference",
-                       registers=(base + 22, base + 23), kind=Kind.DIFFERENCE, unit=mv,
-                       device_class=V, precision=0),
-        RegisterSensor(key="soh", name="State of health", registers=(base + 16,), scale=0.1,
-                       unit=PERCENTAGE, precision=1),
+        RegisterSensor(
+            key="max_cell_voltage",
+            name="Max cell voltage",
+            registers=(base + 22,),
+            scale=0.001,
+            unit=VOLT,
+            device_class=V,
+            precision=3,
+        ),
+        RegisterSensor(
+            key="min_cell_voltage",
+            name="Min cell voltage",
+            registers=(base + 23,),
+            scale=0.001,
+            unit=VOLT,
+            device_class=V,
+            precision=3,
+        ),
+        RegisterSensor(
+            key="cell_voltage_difference",
+            name="Cell voltage difference",
+            registers=(base + 22, base + 23),
+            kind=Kind.DIFFERENCE,
+            unit=mv,
+            device_class=V,
+            precision=0,
+        ),
+        RegisterSensor(
+            key="soh",
+            name="State of health",
+            registers=(base + 16,),
+            scale=0.1,
+            unit=PERCENTAGE,
+            precision=1,
+        ),
         RegisterSensor(key="cycles", name="Cycles", registers=(base + 24,), state_class=TOTAL),
-        RegisterSensor(key="capacity", name="Capacity", registers=(base + 18,), scale=0.1,
-                       unit="Ah", precision=1, enabled=False),
+        RegisterSensor(
+            key="capacity",
+            name="Capacity",
+            registers=(base + 18,),
+            scale=0.1,
+            unit="Ah",
+            precision=1,
+            enabled=False,
+        ),
         temperature("max_cell_temperature", "Max cell temperature", base + 11, enabled=False),
         temperature("min_cell_temperature", "Min cell temperature", base + 12, enabled=False),
         temperature("mos_temperature", "MOS temperature", base + 13, enabled=False),
@@ -435,37 +579,88 @@ TOU_SLOTS = 6
 
 
 def _current(key, name, reg, **kw) -> Control:
-    return Control(key=key, name=name, register=reg, platform=ControlPlatform.NUMBER, maximum=240,
-                   unit=AMP, device_class="current", **kw)
+    return Control(
+        key=key,
+        name=name,
+        register=reg,
+        platform=ControlPlatform.NUMBER,
+        maximum=240,
+        unit=AMP,
+        device_class="current",
+        **kw,
+    )
 
 
 def _soc(key, name, reg, **kw) -> Control:
-    return Control(key=key, name=name, register=reg, platform=ControlPlatform.NUMBER,
-                   slider=True, unit=PERCENTAGE, device_class="battery", **kw)
+    return Control(
+        key=key,
+        name=name,
+        register=reg,
+        platform=ControlPlatform.NUMBER,
+        slider=True,
+        unit=PERCENTAGE,
+        device_class="battery",
+        **kw,
+    )
 
 
-def tou_controls(time: int, power: int, voltage: int, soc: int, charge: int
-                 ) -> tuple[Control, ...]:
+def tou_controls(time: int, power: int, voltage: int, soc: int, charge: int) -> tuple[Control, ...]:
     controls: list[Control] = []
     for i in range(TOU_SLOTS):
         n = i + 1
         controls += [
-            Control(key=f"tou{n}_time", name=f"TOU slot {n} time", register=time + i,
-                    platform=ControlPlatform.TIME, tou_slot=i),
+            Control(
+                key=f"tou{n}_time",
+                name=f"TOU slot {n} time",
+                register=time + i,
+                platform=ControlPlatform.TIME,
+                tou_slot=i,
+            ),
             _soc(f"tou{n}_soc", f"TOU slot {n} SOC", soc + i, tou_slot=i),
-            Control(key=f"tou{n}_power", name=f"TOU slot {n} power", register=power + i,
-                    platform=ControlPlatform.NUMBER, maximum=None, step=10, slider=True, unit=W,
-                    device_class="power", enabled=False, tou_slot=i),
-            Control(key=f"tou{n}_voltage", name=f"TOU slot {n} voltage",
-                    register=voltage + i, platform=ControlPlatform.NUMBER, scale=0.01,
-                    maximum=65, step=0.1, unit=VOLT, device_class="voltage",
-                    enabled=False, tou_slot=i),
-            Control(key=f"tou{n}_grid_charge", name=f"TOU slot {n} grid charge",
-                    register=charge + i, platform=ControlPlatform.SWITCH, mask=0x0001,
-                    enabled=False, tou_slot=i),
-            Control(key=f"tou{n}_generator_charge", name=f"TOU slot {n} generator charge",
-                    register=charge + i, platform=ControlPlatform.SWITCH, mask=0x0002,
-                    enabled=False, tou_slot=i),
+            Control(
+                key=f"tou{n}_power",
+                name=f"TOU slot {n} power",
+                register=power + i,
+                platform=ControlPlatform.NUMBER,
+                maximum=None,
+                step=10,
+                slider=True,
+                unit=W,
+                device_class="power",
+                enabled=False,
+                tou_slot=i,
+            ),
+            Control(
+                key=f"tou{n}_voltage",
+                name=f"TOU slot {n} voltage",
+                register=voltage + i,
+                platform=ControlPlatform.NUMBER,
+                scale=0.01,
+                maximum=65,
+                step=0.1,
+                unit=VOLT,
+                device_class="voltage",
+                enabled=False,
+                tou_slot=i,
+            ),
+            Control(
+                key=f"tou{n}_grid_charge",
+                name=f"TOU slot {n} grid charge",
+                register=charge + i,
+                platform=ControlPlatform.SWITCH,
+                mask=0x0001,
+                enabled=False,
+                tou_slot=i,
+            ),
+            Control(
+                key=f"tou{n}_generator_charge",
+                name=f"TOU slot {n} generator charge",
+                register=charge + i,
+                platform=ControlPlatform.SWITCH,
+                mask=0x0002,
+                enabled=False,
+                tou_slot=i,
+            ),
         ]
     return tuple(controls)
 
@@ -500,8 +695,7 @@ def _single_phase_power_coarse(regs: dict[int, int]) -> bool | None:
     """
     try:
         grid, load, inverter = (
-            _s16(regs[r])
-            for r in (SINGLE_PHASE_GRID, SINGLE_PHASE_LOAD, SINGLE_PHASE_INVERTER)
+            _s16(regs[r]) for r in (SINGLE_PHASE_GRID, SINGLE_PHASE_LOAD, SINGLE_PHASE_INVERTER)
         )
     except KeyError:
         return None
@@ -544,11 +738,16 @@ SINGLE_PHASE = Family(
     has_battery_modules=True,
     sensors=(
         *IDENTITY,
-        *status(0x003B, (0x0065, 0x0066), (0x0067, 0x0068, 0x0069, 0x006A),
-                (0x0016, 0x0017, 0x0018)),
-        RegisterSensor(key="battery_soc", name="Battery SOC",
-                       registers=(0x00B8,),
-                       unit=PERCENTAGE, device_class=SensorDeviceClass.BATTERY),
+        *status(
+            0x003B, (0x0065, 0x0066), (0x0067, 0x0068, 0x0069, 0x006A), (0x0016, 0x0017, 0x0018)
+        ),
+        RegisterSensor(
+            key="battery_soc",
+            name="Battery SOC",
+            registers=(0x00B8,),
+            unit=PERCENTAGE,
+            device_class=SensorDeviceClass.BATTERY,
+        ),
         volts("battery_voltage", "Battery voltage", 0x00B7, scale=0.01),
         amps("battery_current", "Battery current", 0x00BF, coarse=Coarse.BATTERY_CURRENT),
         power("battery_power", "Battery power", 0x00BE),
@@ -557,8 +756,7 @@ SINGLE_PHASE = Family(
         hertz("grid_frequency", "Grid frequency", 0x004F),
         power("grid_power", "Grid power", 0x00A9, coarse=Coarse.POWER),
         amps("grid_current", "Grid current", 0x00A0, enabled=False),
-        power("external_ct_power", "External CT power", 0x00AC, enabled=False,
-              coarse=Coarse.POWER),
+        power("external_ct_power", "External CT power", 0x00AC, enabled=False, coarse=Coarse.POWER),
         volts("output_voltage", "Output voltage", 0x009C, enabled=False),
         hertz("output_frequency", "Output frequency", 0x00C1, enabled=False),
         power("inverter_power", "Inverter power", 0x00AF),
@@ -574,11 +772,13 @@ SINGLE_PHASE = Family(
         power("pv3_power", "PV3 power", 0x00BC, kind=Kind.U16, string=3),
         power("pv4_power", "PV4 power", 0x00BD, kind=Kind.U16, string=4),
         volts("pv3_voltage", "PV3 voltage", 0x0071, enabled=False, string=3),
-        amps("pv3_current", "PV3 current", 0x0072, scale=0.1, kind=Kind.U16, enabled=False,
-             string=3),
+        amps(
+            "pv3_current", "PV3 current", 0x0072, scale=0.1, kind=Kind.U16, enabled=False, string=3
+        ),
         volts("pv4_voltage", "PV4 voltage", 0x0073, enabled=False, string=4),
-        amps("pv4_current", "PV4 current", 0x0074, scale=0.1, kind=Kind.U16, enabled=False,
-             string=4),
+        amps(
+            "pv4_current", "PV4 current", 0x0074, scale=0.1, kind=Kind.U16, enabled=False, string=4
+        ),
         power("generator_power", "Generator power", 0x00A6, kind=Kind.U16, enabled=False),
         temperature("dc_temperature", "DC temperature", 0x005A),
         temperature("ac_temperature", "AC temperature", 0x005B),
@@ -606,39 +806,92 @@ SINGLE_PHASE = Family(
     ),
     controls=(
         _current("max_charge_current", "Battery max charge current", 0x00D2, config=False),
-        _current("max_discharge_current", "Battery max discharge current", 0x00D3,
-                 config=False, enabled=False),
+        _current(
+            "max_discharge_current",
+            "Battery max discharge current",
+            0x00D3,
+            config=False,
+            enabled=False,
+        ),
         _current("grid_charge_current", "Grid charge current", 0x00E6, config=False),
         _soc("shutdown_soc", "Battery shutdown SOC", 0x00D9),
         _soc("restart_soc", "Battery restart SOC", 0x00DA),
         _soc("low_soc", "Battery low SOC", 0x00DB, enabled=False),
         _soc("grid_charge_start_soc", "Grid charge start SOC", 0x00E5, enabled=False),
-        Control(key="grid_charge", name="Grid charge", register=0x00E8,
-                platform=ControlPlatform.SWITCH),
-        Control(key="generator_charge", name="Generator charge", register=0x00E7,
-                platform=ControlPlatform.SWITCH, enabled=False),
-        Control(key="energy_pattern", name="Energy pattern", register=0x00F3,
-                platform=ControlPlatform.SELECT, config=False,
-                options={0: "battery_first", 1: "load_first"}),
-        Control(key="max_sell_power", name="Max sell power", register=0x00F5,
-                platform=ControlPlatform.NUMBER, maximum=None, step=10, slider=True,
-                unit=W, device_class="power", enabled=False),
-        Control(key="zero_export_power", name="Zero export power", register=0x00CE,
-                platform=ControlPlatform.NUMBER, maximum=1000, unit=W,
-                device_class="power", enabled=False),
-        Control(key="grid_peak_shaving", name="Grid peak shaving", register=0x0118,
-                platform=ControlPlatform.SWITCH, mask=0x0100, enabled=False),
-        Control(key="grid_peak_shaving_power", name="Grid peak shaving power",
-                register=0x0125, platform=ControlPlatform.NUMBER, maximum=30000, step=10,
-                unit=W, device_class="power", enabled=False),
-        Control(key="work_mode", name="Work mode", register=0x00F4,
-                platform=ControlPlatform.SELECT,
-                options={0: "selling_first", 1: "zero_export_to_load",
-                         2: "zero_export_to_ct"}),
-        Control(key="time_of_use", name="Time of use", register=0x00F8,
-                platform=ControlPlatform.SWITCH, mask=0x0001),
-        *tou_controls(time=0x00FA, power=0x0100, voltage=0x0106, soc=0x010C,
-                      charge=0x0112),
+        Control(
+            key="grid_charge", name="Grid charge", register=0x00E8, platform=ControlPlatform.SWITCH
+        ),
+        Control(
+            key="generator_charge",
+            name="Generator charge",
+            register=0x00E7,
+            platform=ControlPlatform.SWITCH,
+            enabled=False,
+        ),
+        Control(
+            key="energy_pattern",
+            name="Energy pattern",
+            register=0x00F3,
+            platform=ControlPlatform.SELECT,
+            config=False,
+            options={0: "battery_first", 1: "load_first"},
+        ),
+        Control(
+            key="max_sell_power",
+            name="Max sell power",
+            register=0x00F5,
+            platform=ControlPlatform.NUMBER,
+            maximum=None,
+            step=10,
+            slider=True,
+            unit=W,
+            device_class="power",
+            enabled=False,
+        ),
+        Control(
+            key="zero_export_power",
+            name="Zero export power",
+            register=0x00CE,
+            platform=ControlPlatform.NUMBER,
+            maximum=1000,
+            unit=W,
+            device_class="power",
+            enabled=False,
+        ),
+        Control(
+            key="grid_peak_shaving",
+            name="Grid peak shaving",
+            register=0x0118,
+            platform=ControlPlatform.SWITCH,
+            mask=0x0100,
+            enabled=False,
+        ),
+        Control(
+            key="grid_peak_shaving_power",
+            name="Grid peak shaving power",
+            register=0x0125,
+            platform=ControlPlatform.NUMBER,
+            maximum=30000,
+            step=10,
+            unit=W,
+            device_class="power",
+            enabled=False,
+        ),
+        Control(
+            key="work_mode",
+            name="Work mode",
+            register=0x00F4,
+            platform=ControlPlatform.SELECT,
+            options={0: "selling_first", 1: "zero_export_to_load", 2: "zero_export_to_ct"},
+        ),
+        Control(
+            key="time_of_use",
+            name="Time of use",
+            register=0x00F8,
+            platform=ControlPlatform.SWITCH,
+            mask=0x0001,
+        ),
+        *tou_controls(time=0x00FA, power=0x0100, voltage=0x0106, soc=0x010C, charge=0x0112),
     ),
 )
 
@@ -659,21 +912,34 @@ THREE_PHASE_OVERRIDES: dict[str, dict[str, Any]] = {
 # power goes above the rated power (11000 W on a 10 kW unit, whose PV input takes
 # up to 13000 W), so it is bounded by the range ha-solarman uses for these models.
 THREE_PHASE_EXTRA_CONTROLS = (
-    Control(key="solar_sell", name="Solar sell", register=0x0091,
-            platform=ControlPlatform.SWITCH),
-    Control(key="max_solar_power", name="Max solar power", register=0x0154,
-            platform=ControlPlatform.NUMBER, maximum=32000, step=10, unit=W,
-            device_class="power"),
+    Control(key="solar_sell", name="Solar sell", register=0x0091, platform=ControlPlatform.SWITCH),
+    Control(
+        key="max_solar_power",
+        name="Max solar power",
+        register=0x0154,
+        platform=ControlPlatform.NUMBER,
+        maximum=32000,
+        step=10,
+        unit=W,
+        device_class="power",
+    ),
 )
 
 
 def three_phase_controls() -> tuple[Control, ...]:
     """The single phase controls at their three phase addresses, all enabled."""
-    return tuple(
-        replace(c, register=c.register - THREE_PHASE_OFFSET, enabled=True,
-                **THREE_PHASE_OVERRIDES.get(c.key, {}))
-        for c in SINGLE_PHASE.controls
-    ) + THREE_PHASE_EXTRA_CONTROLS
+    return (
+        tuple(
+            replace(
+                c,
+                register=c.register - THREE_PHASE_OFFSET,
+                enabled=True,
+                **THREE_PHASE_OVERRIDES.get(c.key, {}),
+            )
+            for c in SINGLE_PHASE.controls
+        )
+        + THREE_PHASE_EXTRA_CONTROLS
+    )
 
 
 # SUN-*K-SG0*LP3, SUN-*K-SG0*HP3
@@ -685,11 +951,16 @@ THREE_PHASE = Family(
     has_battery_modules=True,
     sensors=(
         *IDENTITY,
-        *status(0x01F4, (0x0229, 0x022A), (0x022B, 0x022C, 0x022D, 0x022E),
-                (0x003E, 0x003F, 0x0040)),
-        RegisterSensor(key="battery_soc", name="Battery SOC",
-                       registers=(0x024C,),
-                       unit=PERCENTAGE, device_class=SensorDeviceClass.BATTERY),
+        *status(
+            0x01F4, (0x0229, 0x022A), (0x022B, 0x022C, 0x022D, 0x022E), (0x003E, 0x003F, 0x0040)
+        ),
+        RegisterSensor(
+            key="battery_soc",
+            name="Battery SOC",
+            registers=(0x024C,),
+            unit=PERCENTAGE,
+            device_class=SensorDeviceClass.BATTERY,
+        ),
         volts("battery_voltage", "Battery voltage", 0x024B, scale=0.01),
         amps("battery_current", "Battery current", 0x024F),
         power("battery_power", "Battery power", 0x024E),
@@ -700,8 +971,7 @@ THREE_PHASE = Family(
         # Measured at the inverter's grid port, not at the meter: it is the grid
         # current the Deye Cloud shows, and reads several amps while grid power is
         # near 0 W.
-        *phases(amps, "inverter_grid_port_l{}_current", "Inverter grid port L{} current",
-                0x0262),
+        *phases(amps, "inverter_grid_port_l{}_current", "Inverter grid port L{} current", 0x0262),
         *phases(amps, "external_ct_l{}_current", "External CT L{} current", 0x0265),
         hertz("grid_frequency", "Grid frequency", 0x0261),
         # Totals are read from their original 16-bit registers: signed up to 32,767 W,
@@ -746,18 +1016,28 @@ THREE_PHASE = Family(
         energy("total_load", "Total load consumption", 0x020F, 0x0210),
         energy("today_production", "Today PV production", 0x0211),
         energy("total_production", "Total PV production", 0x0216, 0x0217),
-        RegisterSensor(key="grid_power_factor", name="Grid power factor",
-                       registers=(0x026D,), kind=Kind.S16, scale=0.1, unit=PERCENTAGE,
-                       device_class=SensorDeviceClass.POWER_FACTOR, precision=1,
-                       enabled=False),
+        RegisterSensor(
+            key="grid_power_factor",
+            name="Grid power factor",
+            registers=(0x026D,),
+            kind=Kind.S16,
+            scale=0.1,
+            unit=PERCENTAGE,
+            device_class=SensorDeviceClass.POWER_FACTOR,
+            precision=1,
+            enabled=False,
+        ),
         power("generator_power", "Generator power", 0x029B, enabled=False),
-        energy("today_generator_production", "Today generator production", 0x0218,
-               enabled=False),
-        energy("total_generator_production", "Total generator production", 0x0219, 0x021A,
-               enabled=False),
+        energy("today_generator_production", "Today generator production", 0x0218, enabled=False),
+        energy(
+            "total_generator_production",
+            "Total generator production",
+            0x0219,
+            0x021A,
+            enabled=False,
+        ),
         hours("today_generator_runtime", "Today generator runtime", 0x021B, enabled=False),
-        hours("total_generator_runtime", "Total generator runtime", 0x0200, 0x0201,
-              enabled=False),
+        hours("total_generator_runtime", "Total generator runtime", 0x0200, 0x0201, enabled=False),
         *bms(0x00D2),
         rated(0x0014, 0x0015),
     ),
@@ -770,7 +1050,10 @@ THREE_PHASE = Family(
 # High voltage models scale the time of use power (x10) and voltage (x0.1)
 # differently, so they stay read only until one confirms the map.
 THREE_PHASE_HV = replace(
-    THREE_PHASE, codes=frozenset({0x0006}), controls=(), rated_power=(),
+    THREE_PHASE,
+    codes=frozenset({0x0006}),
+    controls=(),
+    rated_power=(),
     sensors=tuple(s for s in THREE_PHASE.sensors if s.key != "rated_power"),
     support=Support.EXPERIMENTAL,
 )
@@ -797,5 +1080,10 @@ def family_for(device_type: int) -> Family:
         if device_type in family.codes:
             return family
     name = KNOWN_UNSUPPORTED.get(device_type, f"Unknown type {device_type:#06x}")
-    return Family(key="unsupported", name=name, codes=frozenset({device_type}),
-                  support=Support.UNSUPPORTED, sensors=IDENTITY)
+    return Family(
+        key="unsupported",
+        name=name,
+        codes=frozenset({device_type}),
+        support=Support.UNSUPPORTED,
+        sensors=IDENTITY,
+    )

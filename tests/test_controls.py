@@ -1,4 +1,5 @@
 """Settings entities and the verified write path."""
+
 from __future__ import annotations
 
 from datetime import time
@@ -29,9 +30,7 @@ def control(key: str):
 
 
 async def _call(hass: HomeAssistant, domain: str, service: str, entity_id: str, **data):
-    await hass.services.async_call(
-        domain, service, {"entity_id": entity_id, **data}, blocking=True
-    )
+    await hass.services.async_call(domain, service, {"entity_id": entity_id, **data}, blocking=True)
 
 
 async def test_settings_are_shown_as_the_inverter_reports_them(hass: HomeAssistant) -> None:
@@ -156,8 +155,9 @@ async def test_low_voltage_three_phase_writes_its_own_registers(hass: HomeAssist
     three = "deye_three_phase_hybrid"
     assert hass.states.get(f"select.{three}_work_mode") is not None
     assert len(hass.states.async_entity_ids("time")) == 6
-    await _call(hass, "number", "set_value", f"number.{three}_battery_max_charge_current",
-                value=300)
+    await _call(
+        hass, "number", "set_value", f"number.{three}_battery_max_charge_current", value=300
+    )
     assert transport().writes == [(0x006C, [300])]
 
 

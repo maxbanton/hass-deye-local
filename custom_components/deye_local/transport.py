@@ -4,6 +4,7 @@ The logger replies to every command on one notify characteristic, so commands
 are serialised with a lock, and notifications that arrive while no command is
 waiting are dropped rather than mistaken for the next reply.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -77,9 +78,7 @@ class DeyeTransport:
             if self._closed:
                 raise TransportError("transport closed while connecting")
             async with asyncio.timeout(SUBSCRIBE_TIMEOUT):
-                self._command_char, notify = self._resolve_characteristics(
-                    self._client
-                )
+                self._command_char, notify = self._resolve_characteristics(self._client)
                 await self._client.start_notify(notify, self._on_notify)
             reply = await self._command(protocol.HANDSHAKE, protocol.handshake_complete)
             self.logger_type = protocol.parse_handshake(reply)
@@ -113,9 +112,7 @@ class DeyeTransport:
     async def async_write(self, start: int, values: list[int]) -> None:
         if not self.connected:
             raise TransportError("not connected")
-        reply = await self._command(
-            protocol.write_command(start, values), protocol.write_complete
-        )
+        reply = await self._command(protocol.write_command(start, values), protocol.write_complete)
         try:
             protocol.parse_write(reply, start, len(values))
         except protocol.ProtocolError as err:
@@ -181,7 +178,7 @@ class DeyeTransport:
         self._received.set()
 
     def _resolve_characteristics(
-            self, client: BleakClientWithServiceCache
+        self, client: BleakClientWithServiceCache
     ) -> tuple[BleakGATTCharacteristic, BleakGATTCharacteristic]:
         """Resolve the command and reply characteristics."""
         services = client.services

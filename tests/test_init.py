@@ -1,4 +1,5 @@
 """Setup, polling, unload and battery module tests."""
+
 from __future__ import annotations
 
 import asyncio
@@ -182,16 +183,20 @@ async def test_values_go_unavailable_after_the_stale_timeout(hass: HomeAssistant
 
 
 @pytest.mark.parametrize("device_type", [0x0005, 0x0006])
-async def test_mapped_families_raise_no_repair_issue(
-    hass: HomeAssistant, device_type: int
-) -> None:
+async def test_mapped_families_raise_no_repair_issue(hass: HomeAssistant, device_type: int) -> None:
     entry = await _setup(hass, device_type=device_type)
     issue_id = f"model_{entry.entry_id}"
     assert ir.async_get(hass).async_get_issue(DOMAIN, issue_id) is None
     # One left by an earlier version goes away on the next start.
     await hass.config_entries.async_unload(entry.entry_id)
-    ir.async_create_issue(hass, DOMAIN, issue_id, is_fixable=False,
-                          severity=ir.IssueSeverity.WARNING, translation_key="experimental")
+    ir.async_create_issue(
+        hass,
+        DOMAIN,
+        issue_id,
+        is_fixable=False,
+        severity=ir.IssueSeverity.WARNING,
+        translation_key="experimental",
+    )
     await hass.config_entries.async_setup(entry.entry_id)
     await hass.async_block_till_done()
     assert ir.async_get(hass).async_get_issue(DOMAIN, issue_id) is None
@@ -552,7 +557,9 @@ async def _setup_three_phase(hass: HomeAssistant, registers: dict[int, int]) -> 
     registry = er.async_get(hass)
     for key in ("grid_l1_power", "grid_l2_power", "grid_l3_power", "external_ct_power"):
         registry.async_get_or_create(
-            "sensor", DOMAIN, f"2603125693_{key}",
+            "sensor",
+            DOMAIN,
+            f"2603125693_{key}",
             suggested_object_id=f"deye_three_phase_hybrid_{key}",
         )
     with patch(
@@ -569,10 +576,11 @@ def _watts(hass: HomeAssistant, key: str) -> float:
 @pytest.mark.parametrize(
     "registers,expected",
     [
-        (SG04LP3_10K_SOLAR_SELL_OFF,
-         {"grid_power": 12, "inverter_power": 1664, "load_power": 1669}),
-        (SG04LP3_10K_SOLAR_SELL_ON,
-         {"grid_power": 12, "inverter_power": 3833, "load_power": 3847}),
+        (
+            SG04LP3_10K_SOLAR_SELL_OFF,
+            {"grid_power": 12, "inverter_power": 1664, "load_power": 1669},
+        ),
+        (SG04LP3_10K_SOLAR_SELL_ON, {"grid_power": 12, "inverter_power": 3833, "load_power": 3847}),
         (SG05LP3_12K, {"external_ct_power": 2766, "inverter_power": -106, "ups_power": 2648}),
     ],
     ids=["10k-solar-sell-off", "10k-solar-sell-on", "12k"],

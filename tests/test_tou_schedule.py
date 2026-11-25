@@ -1,4 +1,5 @@
 """The set_tou_schedule action: the whole table in as few writes as possible."""
+
 from __future__ import annotations
 
 from unittest.mock import patch
@@ -144,7 +145,8 @@ async def test_write_failure_raises(hass: HomeAssistant) -> None:
 async def test_device_can_be_picked(hass: HomeAssistant) -> None:
     entry = await _setup(hass)
     device = next(
-        d for d in dr.async_entries_for_config_entry(dr.async_get(hass), entry.entry_id)
+        d
+        for d in dr.async_entries_for_config_entry(dr.async_get(hass), entry.entry_id)
         if d.via_device_id is None
     )
     await _set(hass, schedule(slot3={"batt": 70}), device_id=device.id)
@@ -155,8 +157,9 @@ async def test_device_can_be_picked(hass: HomeAssistant) -> None:
 
 async def test_low_voltage_three_phase_writes_its_own_registers(hass: HomeAssistant) -> None:
     await _setup(hass, device_type=5)
-    transport().registers.update({0x0094 + i: hhmm for i, hhmm in enumerate(
-        (100, 500, 900, 1300, 1700, 2100))})
+    transport().registers.update(
+        {0x0094 + i: hhmm for i, hhmm in enumerate((100, 500, 900, 1300, 1700, 2100))}
+    )
     await _set(hass, [{}, {}, {"batt": 70}, {}, {}, {}])
     assert transport().writes == [(0x00A8, [70])]
 
@@ -203,8 +206,12 @@ async def test_time_of_use_switch_carries_the_table(hass: HomeAssistant) -> None
     state = hass.states.get(f"switch.{PREFIX}_time_of_use")
     schedule = state.attributes["schedule"]
     assert schedule[0] == {
-        "time": "01:00", "power": 6000, "batt": 85,
-        "grid_charge": True, "gen": False, "voltage": 49.0,
+        "time": "01:00",
+        "power": 6000,
+        "batt": 85,
+        "grid_charge": True,
+        "gen": False,
+        "voltage": 49.0,
     }
     assert [slot["time"] for slot in schedule] == [s["time"] for s in CURRENT]
     await _set(hass, [{}, {}, {"batt": 65}, {}, {}, {}])

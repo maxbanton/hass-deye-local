@@ -1,4 +1,5 @@
 """Config and options flow tests."""
+
 from __future__ import annotations
 
 from unittest.mock import AsyncMock, patch
@@ -23,9 +24,7 @@ from custom_components.deye_local.transport import TransportError
 from .common import ADDRESS, NAME, service_info
 
 IDENTIFY = "custom_components.deye_local.config_flow.async_identify"
-DISCOVERED = (
-    "custom_components.deye_local.config_flow.bluetooth.async_discovered_service_info"
-)
+DISCOVERED = "custom_components.deye_local.config_flow.bluetooth.async_discovered_service_info"
 SINGLE_PHASE = Identity(device_type=0x0003, serial="2603125693")
 
 
@@ -110,18 +109,14 @@ async def test_user_flow_without_loggers_explains_what_is_needed(
     hass: HomeAssistant,
 ) -> None:
     with patch(DISCOVERED, return_value=[]):
-        result = await hass.config_entries.flow.async_init(
-            DOMAIN, context={"source": SOURCE_USER}
-        )
+        result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": SOURCE_USER})
     assert result["type"] is FlowResultType.ABORT
     assert result["reason"] == "no_devices_found"
 
 
 async def test_user_flow_picks_a_discovered_logger(hass: HomeAssistant) -> None:
     with patch(DISCOVERED, return_value=[service_info()]):
-        result = await hass.config_entries.flow.async_init(
-            DOMAIN, context={"source": SOURCE_USER}
-        )
+        result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": SOURCE_USER})
     assert result["step_id"] == "user"
     with patch(IDENTIFY, AsyncMock(return_value=SINGLE_PHASE)):
         result = await hass.config_entries.flow.async_configure(
@@ -173,6 +168,7 @@ async def test_identify_reads_the_model_and_serial_and_lets_go() -> None:
     assert identity.serial == "2603125693"
     assert not FakeTransport.instances[-1].connected
 
+
 @pytest.mark.parametrize(
     "name,manufacturer_data,expected",
     [
@@ -188,9 +184,7 @@ async def test_identify_reads_the_model_and_serial_and_lets_go() -> None:
         ("AP_１２３４５６７８９０", {0x3030: b"\x30"}, False),
     ],
 )
-def test_alternative_wible_advertisement(
-        name, manufacturer_data, expected
-) -> None:
+def test_alternative_wible_advertisement(name, manufacturer_data, expected) -> None:
     info = service_info(
         name=name,
         service_uuids=[],
@@ -202,8 +196,9 @@ def test_alternative_wible_advertisement(
 def test_legacy_wible_advertisement() -> None:
     assert _is_logger(service_info())
 
+
 async def test_user_flow_discovers_alternative_wible(
-        hass: HomeAssistant,
+    hass: HomeAssistant,
 ) -> None:
     info = service_info(
         name="AP_9876543210",
@@ -212,9 +207,7 @@ async def test_user_flow_discovers_alternative_wible(
     )
 
     with patch(DISCOVERED, return_value=[info]):
-        result = await hass.config_entries.flow.async_init(
-            DOMAIN, context={"source": SOURCE_USER}
-        )
+        result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": SOURCE_USER})
 
     assert result["type"] is FlowResultType.FORM
     assert result["step_id"] == "user"
@@ -226,8 +219,9 @@ async def test_user_flow_discovers_alternative_wible(
 
     assert result["step_id"] == "confirm"
 
+
 async def test_bluetooth_discovery_of_alternative_wible(
-        hass: HomeAssistant,
+    hass: HomeAssistant,
 ) -> None:
     info = service_info(
         name="AP_9876543210",
@@ -239,15 +233,14 @@ async def test_bluetooth_discovery_of_alternative_wible(
 
     assert result["step_id"] == "confirm"
 
-    result = await hass.config_entries.flow.async_configure(
-        result["flow_id"], {}
-    )
+    result = await hass.config_entries.flow.async_configure(result["flow_id"], {})
 
     assert result["type"] is FlowResultType.CREATE_ENTRY
     assert result["result"].unique_id == ADDRESS
 
+
 async def test_bluetooth_discovery_rejects_unrelated_device(
-        hass: HomeAssistant,
+    hass: HomeAssistant,
 ) -> None:
     info = service_info(
         name="AP_9876543210",

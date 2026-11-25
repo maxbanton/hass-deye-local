@@ -1,4 +1,5 @@
 """Tests for the logger's command framing."""
+
 from __future__ import annotations
 
 import pytest

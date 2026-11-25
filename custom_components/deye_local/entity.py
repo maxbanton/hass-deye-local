@@ -1,4 +1,5 @@
 """Devices and base entities for Deye Local: the inverter and its battery modules."""
+
 from __future__ import annotations
 
 from homeassistant.config_entries import ConfigEntry

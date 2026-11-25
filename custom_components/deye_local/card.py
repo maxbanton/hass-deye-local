@@ -1,4 +1,5 @@
 """Serve the dashboard cards and load them on the dashboards."""
+
 from __future__ import annotations
 
 from pathlib import Path

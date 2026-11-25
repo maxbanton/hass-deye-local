@@ -1,4 +1,5 @@
 """The Deye Local integration: Deye inverters over the WiBLE logger's Bluetooth link."""
+
 from __future__ import annotations
 
 from homeassistant.components import bluetooth
@@ -179,9 +180,7 @@ async def async_remove_config_entry_device(
     in_use = {inverter_identifier(coordinator)} | {
         f"battery_{serial}" for serial in coordinator.battery_slots
     }
-    return not any(
-        domain == DOMAIN and ident in in_use for domain, ident in device.identifiers
-    )
+    return not any(domain == DOMAIN and ident in in_use for domain, ident in device.identifiers)
 
 
 async def async_remove_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:

@@ -1,4 +1,5 @@
 """Config flow for Deye Local."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -79,13 +80,13 @@ def _is_logger(info: BluetoothServiceInfoBleak) -> bool:
     serial = name[3:]
 
     return (
-            name.startswith("AP_")
-            and len(serial) == 10
-            and serial.isascii()
-            and serial.isdigit()
-            and info.manufacturer_data.get(WIBLE_MANUFACTURER_ID)
-            == WIBLE_MANUFACTURER_DATA
+        name.startswith("AP_")
+        and len(serial) == 10
+        and serial.isascii()
+        and serial.isdigit()
+        and info.manufacturer_data.get(WIBLE_MANUFACTURER_ID) == WIBLE_MANUFACTURER_DATA
     )
+
 
 def _display_name(info: BluetoothServiceInfoBleak) -> str:
     """The logger advertises its serial as its name, but only in scan responses."""
@@ -111,7 +112,7 @@ class DeyeLocalConfigFlow(ConfigFlow, domain=DOMAIN):
         return DeyeLocalOptionsFlow()
 
     async def async_step_bluetooth(
-            self, discovery_info: BluetoothServiceInfoBleak
+        self, discovery_info: BluetoothServiceInfoBleak
     ) -> ConfigFlowResult:
         if not _is_logger(discovery_info):
             return self.async_abort(reason="no_devices_found")
@@ -119,9 +120,7 @@ class DeyeLocalConfigFlow(ConfigFlow, domain=DOMAIN):
         await self.async_set_unique_id(discovery_info.address)
         self._abort_if_unique_id_configured()
         self._info = discovery_info
-        self.context["title_placeholders"] = {
-            "name": _display_name(discovery_info)
-        }
+        self.context["title_placeholders"] = {"name": _display_name(discovery_info)}
         return await self.async_step_bluetooth_confirm()
 
     async def async_step_bluetooth_confirm(
@@ -137,9 +136,7 @@ class DeyeLocalConfigFlow(ConfigFlow, domain=DOMAIN):
             description_placeholders={"logger": _display_name(self._info)},
         )
 
-    async def async_step_user(
-        self, user_input: dict[str, Any] | None = None
-    ) -> ConfigFlowResult:
+    async def async_step_user(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         if user_input is not None:
             self._info = self._candidates[user_input[CONF_ADDRESS]]
             await self.async_set_unique_id(self._info.address, raise_on_progress=False)
@@ -211,9 +208,7 @@ class DeyeLocalConfigFlow(ConfigFlow, domain=DOMAIN):
 class DeyeLocalOptionsFlow(OptionsFlow):
     """Polling interval."""
 
-    async def async_step_init(
-        self, user_input: dict[str, Any] | None = None
-    ) -> ConfigFlowResult:
+    async def async_step_init(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         if user_input is not None:
             return self.async_create_entry(data=user_input)
         options = self.config_entry.options

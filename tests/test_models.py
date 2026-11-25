@@ -1,4 +1,5 @@
 """Register map tests, checked against a real inverter snapshot and the Deye Cloud."""
+
 from __future__ import annotations
 
 import pytest
@@ -82,12 +83,27 @@ def test_32_bit_values_are_low_word_first():
 
 
 THREE_PHASE_TOTALS = (
-    "grid_power", "grid_l1_power", "grid_l2_power", "grid_l3_power", "external_ct_power",
-    "inverter_power", "ups_power", "load_power", "generator_power",
+    "grid_power",
+    "grid_l1_power",
+    "grid_l2_power",
+    "grid_l3_power",
+    "external_ct_power",
+    "inverter_power",
+    "ups_power",
+    "load_power",
+    "generator_power",
 )
 # Upper halves protocol V104 added to the totals for units above 32,767 W.
 THREE_PHASE_HIGH_WORDS = {
-    0x0293, 0x029F, 0x02AF, 0x02B0, 0x02B1, 0x02B2, 0x02B6, 0x02BB, 0x02C4,
+    0x0293,
+    0x029F,
+    0x02AF,
+    0x02B0,
+    0x02B1,
+    0x02B2,
+    0x02B6,
+    0x02BB,
+    0x02C4,
 }
 
 
@@ -149,14 +165,37 @@ def test_low_voltage_three_phase_has_the_single_phase_settings_lower():
 # Read from a SUN-10K-SG04LP3-EU on 2026-11-18, a minute apart from the Deye
 # Cloud values in the comments.
 THREE_PHASE_PER_PHASE = {
-    0x0262: 73, 0x0263: 106, 0x0264: 535, 0x0265: 93, 0x0266: 111, 0x0267: 166,
-    0x0268: 4, 0x0269: 3, 0x026A: 5, 0x026B: 12,
-    0x0273: 2349, 0x0274: 2337, 0x0275: 2346,
-    0x0276: 50, 0x0277: 90, 0x0278: 530,
-    0x0279: 157, 0x027A: 243, 0x027B: 1264, 0x027C: 1664,
-    0x0280: 14, 0x0281: 17, 0x0282: 24, 0x0283: 55,
-    0x0284: 2335, 0x0285: 2340, 0x0286: 2332,
-    0x028A: 161, 0x028B: 243, 0x028C: 1265, 0x028D: 1669,
+    0x0262: 73,
+    0x0263: 106,
+    0x0264: 535,
+    0x0265: 93,
+    0x0266: 111,
+    0x0267: 166,
+    0x0268: 4,
+    0x0269: 3,
+    0x026A: 5,
+    0x026B: 12,
+    0x0273: 2349,
+    0x0274: 2337,
+    0x0275: 2346,
+    0x0276: 50,
+    0x0277: 90,
+    0x0278: 530,
+    0x0279: 157,
+    0x027A: 243,
+    0x027B: 1264,
+    0x027C: 1664,
+    0x0280: 14,
+    0x0281: 17,
+    0x0282: 24,
+    0x0283: 55,
+    0x0284: 2335,
+    0x0285: 2340,
+    0x0286: 2332,
+    0x028A: 161,
+    0x028B: 243,
+    0x028C: 1265,
+    0x028D: 1669,
 }
 
 
@@ -178,9 +217,17 @@ def test_three_phase_per_phase_readings():
 
 
 def test_three_phase_per_phase_sensors_are_enabled_by_default():
-    parts = ("inverter_grid_port_l{}_current", "external_ct_l{}_current", "external_ct_l{}_power",
-             "inverter_l{}_voltage", "inverter_l{}_current", "inverter_l{}_power",
-             "ups_l{}_power", "load_l{}_voltage", "load_l{}_power")
+    parts = (
+        "inverter_grid_port_l{}_current",
+        "external_ct_l{}_current",
+        "external_ct_l{}_power",
+        "inverter_l{}_voltage",
+        "inverter_l{}_current",
+        "inverter_l{}_power",
+        "ups_l{}_power",
+        "load_l{}_voltage",
+        "load_l{}_power",
+    )
     keys = {part.format(n) for part in parts for n in (1, 2, 3)}
     sensors = {s.key: s for s in THREE_PHASE.sensors}
     assert keys <= sensors.keys()
@@ -280,8 +327,7 @@ def test_coarse_unit_is_detected_and_scaled():
 
 def test_documented_unit_is_detected():
     # A SUN-6K discharging into the house: 1.8 kW load, 20.9 A out of the battery.
-    regs = {0x00A9: 300, 0x00AF: 1500, 0x00B2: 1800, 0x00B7: 5300, 0x00BE: 1110,
-            0x00BF: 2090}
+    regs = {0x00A9: 300, 0x00AF: 1500, 0x00B2: 1800, 0x00B7: 5300, 0x00BE: 1110, 0x00BF: 2090}
     assert [check(regs) for _, check in SINGLE_PHASE.unit_checks] == [False, False]
 
 
@@ -291,8 +337,7 @@ def test_documented_unit_is_detected():
         # Too little inverter power and battery current to tell.
         SNAPSHOT,
         # Readings that fit neither unit.
-        {0x00A9: 1000, 0x00AF: 1000, 0x00B2: 1000, 0x00B7: 5000, 0x00BE: 1000,
-         0x00BF: 500},
+        {0x00A9: 1000, 0x00AF: 1000, 0x00B2: 1000, 0x00B7: 5000, 0x00BE: 1000, 0x00BF: 500},
         # Missing registers.
         {},
         {0x00B7: 0, 0x00BE: 1000, 0x00BF: 2000},
@@ -315,8 +360,17 @@ def test_pv_strings_follow_the_mppt_count():
 # Read from the same SUN-10K-SG04LP3-EU, and from a SUN-12K-SG05LP3-EU, whose
 # Deye Cloud pages showed 10 kW and 12 kW.
 THREE_PHASE_10K = {
-    0x0014: 34464, 0x0015: 1, 0x026D: 65476, 0x0200: 9, 0x0201: 0,
-    0x0218: 0, 0x0219: 0, 0x021A: 0, 0x021B: 0, 0x0228: 5, 0x029B: 0,
+    0x0014: 34464,
+    0x0015: 1,
+    0x026D: 65476,
+    0x0200: 9,
+    0x0201: 0,
+    0x0218: 0,
+    0x0219: 0,
+    0x021A: 0,
+    0x021B: 0,
+    0x0228: 5,
+    0x029B: 0,
 }
 THREE_PHASE_12K = {0x0014: 54464, 0x0015: 1, 0x026D: 998, 0x0228: 5}
 

@@ -1,4 +1,5 @@
 """BLE session tests against a scripted fake of the logger's GATT interface."""
+
 from __future__ import annotations
 
 import asyncio
@@ -35,13 +36,13 @@ class FakeLogger:
     """Answers commands like the logger: replies arrive as one or more notifications."""
 
     def __init__(
-            self,
-            chunk: int = 20,
-            service_uuid: str = SERVICE_UUID,
-            notify_char: str = NOTIFY_CHAR,
-            *,
-            has_command: bool = True,
-            has_notify: bool = True,
+        self,
+        chunk: int = 20,
+        service_uuid: str = SERVICE_UUID,
+        notify_char: str = NOTIFY_CHAR,
+        *,
+        has_command: bool = True,
+        has_notify: bool = True,
     ) -> None:
         self.chunk = chunk
         self.is_connected = True
@@ -74,8 +75,8 @@ class FakeLogger:
         service.get_characteristic.side_effect = characteristics.get
 
         self.services = MagicMock()
-        self.services.get_service.side_effect = (
-            lambda uuid: service if uuid == self.service_uuid else None
+        self.services.get_service.side_effect = lambda uuid: (
+            service if uuid == self.service_uuid else None
         )
         self.services.get_characteristic.side_effect = characteristics.get
 
@@ -136,8 +137,8 @@ def logger(request):
         return fake
 
     with patch(
-            "custom_components.deye_local.transport.establish_connection",
-            connect,
+        "custom_components.deye_local.transport.establish_connection",
+        connect,
     ):
         yield fake
 
@@ -391,6 +392,7 @@ def test_fresher_device_is_used(transport) -> None:
     transport.set_device(info.device)
     assert transport._device is info.device
 
+
 @pytest.mark.parametrize(
     "service_uuid,notify_char,has_command,has_notify",
     [
@@ -400,15 +402,15 @@ def test_fresher_device_is_used(transport) -> None:
         (SERVICE_UUID, NOTIFY_CHAR, True, False),
         (SERVICE_UUID, NOTIFY_CHAR, False, False),
         (
-                "0000ffff-0000-1000-8000-00805f9b34fb",
-                ALT_NOTIFY_CHAR,
-                True,
-                True,
+            "0000ffff-0000-1000-8000-00805f9b34fb",
+            ALT_NOTIFY_CHAR,
+            True,
+            True,
         ),
     ],
 )
 async def test_unsupported_gatt_layout(
-        transport, service_uuid, notify_char, has_command, has_notify
+    transport, service_uuid, notify_char, has_command, has_notify
 ) -> None:
     fake = FakeLogger(
         service_uuid=service_uuid,
@@ -436,8 +438,9 @@ async def test_unsupported_gatt_layout(
     assert not fake.is_connected
     assert not fake.written
 
+
 async def test_legacy_characteristics_in_another_service(
-        transport,
+    transport,
 ) -> None:
     fake = FakeLogger(
         service_uuid="0000ffff-0000-1000-8000-00805f9b34fb",
@@ -448,15 +451,16 @@ async def test_legacy_characteristics_in_another_service(
         return fake
 
     with patch(
-            "custom_components.deye_local.transport.establish_connection",
-            connect,
+        "custom_components.deye_local.transport.establish_connection",
+        connect,
     ):
         await transport.async_connect()
         assert await transport.async_read(0, 1) == [3]
         await transport.async_disconnect()
 
+
 async def test_reconnect_resolves_fresh_characteristics(
-        transport,
+    transport,
 ) -> None:
     first = FakeLogger()
     second = FakeLogger(
@@ -470,8 +474,8 @@ async def test_reconnect_resolves_fresh_characteristics(
         return next(clients)
 
     with patch(
-            "custom_components.deye_local.transport.establish_connection",
-            connect,
+        "custom_components.deye_local.transport.establish_connection",
+        connect,
     ):
         await transport.async_connect()
         assert await transport.async_read(0, 1) == [3]

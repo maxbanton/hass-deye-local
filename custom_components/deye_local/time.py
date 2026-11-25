@@ -3,6 +3,7 @@
 Each slot runs from its start time until the next slot's, so the six start
 times have to stay in ascending order.
 """
+
 from __future__ import annotations
 
 from datetime import time
@@ -51,8 +52,7 @@ class DeyeTime(DeyeControlEntity, TimeEntity):
 
     def _neighbours(self) -> tuple[int | None, int | None]:
         slots: list[Control] = [
-            c for c in self.coordinator.family.controls
-            if c.platform is ControlPlatform.TIME
+            c for c in self.coordinator.family.controls if c.platform is ControlPlatform.TIME
         ]
         index = slots.index(self.control)
         data = self.coordinator.data or {}

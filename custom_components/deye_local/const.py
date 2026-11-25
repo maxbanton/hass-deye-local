@@ -1,4 +1,5 @@
 """Constants for Deye Local."""
+
 from __future__ import annotations
 
 DOMAIN = "deye_local"

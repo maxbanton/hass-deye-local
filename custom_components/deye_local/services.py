@@ -1,4 +1,5 @@
 """Actions of the Deye Local integration."""
+
 from __future__ import annotations
 
 from itertools import pairwise
@@ -52,7 +53,8 @@ def _coordinator(hass: HomeAssistant, call: ServiceCall) -> DeyeLocalCoordinator
     if device_id := call.data.get(ATTR_DEVICE_ID):
         registry = dr.async_get(hass)
         entries = [
-            entry for entry in entries
+            entry
+            for entry in entries
             if any(
                 device.id == device_id
                 for device in dr.async_entries_for_config_entry(registry, entry.entry_id)

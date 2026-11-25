@@ -1,4 +1,5 @@
 """Shared test doubles."""
+
 from __future__ import annotations
 
 from bleak.backends.device import BLEDevice
@@ -15,11 +16,11 @@ NAME = "D26109249480"
 
 
 def service_info(
-        address: str = ADDRESS,
-        name: str = NAME,
-        *,
-        service_uuids: list[str] | None = None,
-        manufacturer_data: dict[int, bytes] | None = None,
+    address: str = ADDRESS,
+    name: str = NAME,
+    *,
+    service_uuids: list[str] | None = None,
+    manufacturer_data: dict[int, bytes] | None = None,
 ) -> BluetoothServiceInfoBleak:
     if service_uuids is None:
         service_uuids = [SERVICE_UUID]
@@ -55,6 +56,7 @@ def service_info(
         time=0,
         tx_power=None,
     )
+
 
 class FakeTransport:
     """Serves registers from a snapshot; unknown registers read as zero."""

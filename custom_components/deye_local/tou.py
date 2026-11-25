@@ -4,6 +4,7 @@ A field left as None keeps the value the inverter holds at write time, so a
 schedule built from slightly stale state does not undo a change made on the
 inverter in the meantime.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass

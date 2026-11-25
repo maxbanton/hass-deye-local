@@ -4,6 +4,7 @@ Taken on 2026-09-30 at 10:36 local time, alongside the Deye Cloud values the
 tests compare against.
 """
 
+# fmt: off
 SNAPSHOT = {
     0x0000: 3, 0x0016: 6665, 0x0017: 7690, 0x0018: 9016, 0x003B: 2, 0x003C: 65532,
     0x003D: 250, 0x003E: 0, 0x003F: 65299, 0x0040: 65535, 0x0041: 0, 0x0042: 1885,
@@ -66,3 +67,4 @@ SNAPSHOT_10K = {
     0x00A9: 385, 0x00AC: 385, 0x00AF: 63900, 0x00B2: 221, 0x00B7: 5452, 0x00BC: 0,
     0x00BE: 64129, 0x00BF: 65278,
 }
+# fmt: on
