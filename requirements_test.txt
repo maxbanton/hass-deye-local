@@ -2,4 +2,4 @@ homeassistant
 pytest
 pytest-asyncio
 pytest-homeassistant-custom-component
-ruff
+ruff==0.17.6
